@@ -1,0 +1,14 @@
+Bench_Press,Full_Compound,10
+Incline_Dumbbell_Press,Semi_Compound,5
+Chest_Fly,Non_Compound
+Tricep_Pull_Down,Non_Compound
+Plate_Loaded_Shoulder_Press,Semi_Compound,5
+Dead_Lifts,Full_Compound
+Pull_Ups,Body_Weight
+Barbell_Rows,Semi_Compound
+Hammer_Curls,Non_Compound,5
+Machine_Curls,Non_Compound
+Hamstring_Curls,Non_Compound
+Squats,Full_Compound
+Calf_Raises,Non_Compound
+Leg_Extensions,Non_Compound

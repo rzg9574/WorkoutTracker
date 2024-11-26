@@ -1,0 +1,24 @@
+{
+    "Push": [
+        "Bench_Press", 
+        "Incline_Dumbbell_Press",
+        "Chest_Fly",
+        "Tricep_Pull_Down",
+        "Plate_Loaded_Shoulder_Press"
+    ], 
+
+    "Pull": [
+        "Dead_Lifts",
+        "Barbell_Rows",
+        "Pull_Ups",
+        "Hammer_Curls",
+        "Machine_Curls"
+    ],
+
+    "Legs": [
+        "Hamstring_Curls",
+        "Squats",
+        "Calf_Raises",
+        "Leg_Extensions"
+    ]
+}
