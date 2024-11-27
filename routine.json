@@ -1,8 +1,8 @@
 {
     "Push": [
         "Bench_Press", 
-        "Incline_Dumbbell_Press",
         "Chest_Fly",
+        "Incline_Dumbbell_Press",
         "Tricep_Pull_Down",
         "Plate_Loaded_Shoulder_Press"
     ], 

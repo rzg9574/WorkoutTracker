@@ -6,6 +6,8 @@ from twilio.twiml.messaging_response import MessagingResponse
 from twilio.rest import Client
 import datetime
 import time
+import threading
+
 
 class Session:
     workouts = []
@@ -30,6 +32,9 @@ class Session:
     
     def getDay(self):
         return self.day
+    
+    def getJson(self):
+        return {"Date":self.date, "List_of_Workouts":[w.getJson() for w in self.workouts], "Rating": self.rating, "Day":self.day}
     
     def __str__(self):
         text = f"{self.day} {self.date} Rating({self.rating}):\n"
@@ -137,14 +142,14 @@ class DBController:
         return sessions
     
     def postWorkOut(self, workout):
-        if type(workout) == Workout:
+        if type(workout) == Session:
             self.workOutsCollection.insert_one(workout.getJson())
             
         
     def loadInExercises(self, textFile):
         with open(textFile) as exercises:
             text = exercises.readlines() 
-            for line in text:
+            for line in text: 
                 splitLine = line.split(",") 
                 
                 if len(splitLine) >= 2:
@@ -179,22 +184,25 @@ class Coach:
     pullRepRangeCycle = []
     pushRepRangeCycle = []
     legsRepRangeCycle = []
+    restDay = False
     repRangeKey = {}
     startingPercentage = 0.82
     db = DBController()
     routine = None
     routineFile = "routine.json"
     day = "Push"
+    todaysRoutine = {}
     
     
     def __init__(self):
         self.loadInRoutine()
-        self.cycle = [["Pull",self.routine["Pull"]], ["Push",self.routine["Push"]], ["Legs",self.routine["Legs"]]]
-        self.pullRepRangeCycle = ["2-4", "4-6", "6-8"]
-        self.pushRepRangeCycle = ["2-4", "4-6", "6-8"]
-        self.legsRepRangeCycle = ["2-4", "4-6", "6-8"]
-        self.repRangeKey = {"Full_Compound": "USE REP RANGE CYCLE", "Semi_Compound": "6-8", "Non_Compound":"10-15", "Body_Weight": "To Failure"}
-        
+        self.cycle = [["Legs",self.routine["Legs"], ["Push",self.routine["Push"]], ["Pull",self.routine["Pull"]]]]
+        self.pullRepRangeCycle = ["6-8", "4-6", "2-4"]
+        self.pushRepRangeCycle = ["6-8", "4-6", "2-4"]
+        self.legsRepRangeCycle = ["6-8", "4-6", "2-4"]
+        self.repRangeKey = {"Full_Compound": "4-8", "Semi_Compound": "6-8", "Non_Compound":"10-15", "Body_Weight": "7-12"}
+        self.todaysRoutine = self.cycle.pop(0)
+        self.cycle.append(self.todaysRoutine)
                 
     def loadInRoutine(self):
         with open(self.routineFile, 'r') as file:
@@ -205,7 +213,9 @@ class Coach:
     def logWorkout(self, name, weight, sets, reps):
         workout = Workout(name, weight, sets, reps)
         self.db.postWorkOut(workout)
-        
+    
+    def setRestDay(self):
+        self.restDay = True 
     
     def sendText(self, msg):
         load_dotenv()
@@ -279,32 +289,42 @@ class Coach:
         load_dotenv()
         sets = []
         workouts = []
+        workoutPlan = self.cycle[-1] 
         session = None
         nextOne = True
         name = None
+        rating = -1
         weight = None
         reps = None
         text = text.replace(f"Message from {os.environ.get('myPhoneNumber')}:", "")
         splitText = text.split("\n")
+        i = 0
         for t in splitText:
-            if "Rating" in t:
-                break
-            if ":" in t:
-                if name:
-                    if sets:
-                        workouts.append(Workout(name, sets))
-                        sets = []
-                index = text.find(":")
-                name = text[:index]
-            
-            tempSplit = t.split("x")
-            weight = tempSplit[0]
-            reps = tempSplit[1]
-            sets.append(Set(weight, reps))
-            
+            if t:
+                if "rating" in t.lower():
+                    rating = t.lower().replace("rating:", "")
+                    break
+                if "skip" in t.lower():
+                    i += 1
+                    continue
         
-        session = Session(workouts, datetime.datetime.today(), int(splitText[-1].replace("Rating:"), ""), self.day)
-        print(session)
+                if ":" in t:
+                    if name:
+                        if sets:
+                            workouts.append(Workout(workoutPlan[-1][i], sets))
+                            sets = []
+                    index = text.find(":")
+                    name = text[:index]
+                else:
+                    tempSplit = t.split("x")
+                    weight = tempSplit[0]
+                    reps = tempSplit[1]
+                    sets.append(Set(weight, reps))
+                i += 0
+            
+        session = Session(workouts, datetime.datetime.today(), int(rating), self.day)
+        
+        self.db.postWorkOut(session)
         return session
     
     
@@ -318,7 +338,9 @@ class Coach:
         passFail = []
         
         for exercise in routine[1]:
-            goodPoints = 0
+            type = self.db.getTypeOfExercise(exercise)
+            compoundPoints = 0
+            nonCompoundPoints = 0
             firstSet = []
             secondSet = []
             lastSet = []
@@ -330,7 +352,7 @@ class Coach:
             for session in results:
                 autoFail = False
                 if session['Rating'] < 5:
-                   goodPoints -= 2
+                   compoundPoints -= 2
                 try:
                     firstSet.append(session["List_of_Workouts"][0]["Sets"][0])        
                 except:
@@ -348,64 +370,127 @@ class Coach:
                 
                 if autoFail:
                     continue
-                    
-            if firstSet:
-                autoFail = False
-                for set in firstSet:
-                    if set["Reps"] < minRep:
-                        passFail.append({exercise: "F"})
-                        autoFail = True
-                        break
-                    if set["Reps"] >= maxRep:
-                        goodPoints += 1
-                        
-                    if set["Reps"] >= minRep:
-                        goodPoints += 2
-
-                if autoFail:
-                    continue
-            else:
-                print("Failed")
-                passFail.append({exercise: "F"})
-                continue 
-                        
-            if secondSet:
-                for set in secondSet:
-                    if set["Reps"] < minRep:
-                        goodPoints -= 1
-                    
-                    if set["Reps"] >= maxRep:
-                        goodPoints += 1
-                    
-                    if set["Reps"] >= minRep:
-                        goodPoints += 1
-            else:
-                goodPoints -=1
-                        
-            if lastSet:
-                for set in lastSet:
-                    if set["Reps"] < minRep:
-                        goodPoints -= .5
-               
-                    if set["Reps"] >= maxRep:
-                        goodPoints += 1
-                    
-                    if set["Reps"] >= minRep:
-                        goodPoints += .5
-            else:
-                goodPoints -= 2    
-
-        
-           
-            if goodPoints < 3:
-                print(f"Failed")
-                passFail.append({exercise: "F"})
-            else:
-                print("Pass")
-                passFail.append({exercise: "P"})
             
-        
-        
+            if exercise == "Dead_Lifts":
+                deadliftPoints = 0
+                if firstSet:
+                    autoFail = False
+                    for set in firstSet:
+                        if set["Reps"] < minRep:
+                            passFail.append({exercise: "F"})
+                            autoFail = True
+                            break
+                        if set["Reps"] >= maxRep:
+                            deadliftPoints += 1
+                        
+                        if set["Reps"] >= minRep:
+                            deadliftPoints += .5
+                            
+                        if set["Reps"] > minRep:
+                            deadliftPoints += 1
+                            
+
+                    if autoFail:
+                        continue
+                    
+                    
+                else:
+                    print("Failed")
+                    passFail.append({exercise: "F"})
+                    continue
+                
+                
+                if deadliftPoints < 2:
+                    print(f"Failed")
+                    passFail.append({exercise: "F"})
+                else:
+                    print("Pass")
+                    passFail.append({exercise: "P"})
+                continue 
+            else:          
+                if firstSet:
+                    autoFail = False
+                    for set in firstSet:
+                        if set["Reps"] < minRep:
+                            passFail.append({exercise: "F"})
+                            autoFail = True
+                            break
+                        if set["Reps"] >= maxRep:
+                            compoundPoints += 1
+                            
+                        if set["Reps"] >= minRep:
+                            compoundPoints += 2
+                            
+                        if set["Reps"] >= int(self.repRangeKey[type["Type"]].split("-")[0]):
+                            nonCompoundPoints += 1
+                            
+                        if set["Reps"] < int(self.repRangeKey[type["Type"]].split("-")[0]):
+                            nonCompoundPoints -= 2
+
+                    if autoFail:
+                        continue
+                else:
+                    print("Failed")
+                    passFail.append({exercise: "F"})
+                    continue 
+                            
+                if secondSet:
+                    for set in secondSet:
+                        if set["Reps"] < minRep:
+                            compoundPoints -= 1
+                        
+                        if set["Reps"] >= maxRep:
+                            compoundPoints += 1
+                        
+                        if set["Reps"] >= int(self.repRangeKey[type["Type"]].split("-")[0]):
+                            nonCompoundPoints += 1
+                        
+                        if set["Reps"] >= minRep:
+                            compoundPoints += 1
+                        
+                        if set["Reps"] < int(self.repRangeKey[type["Type"]].split("-")[0]):
+                            nonCompoundPoints -= 1
+                else:
+                    compoundPoints -=1
+                            
+                if lastSet:
+                    for set in lastSet:
+                        if set["Reps"] < minRep:
+                            compoundPoints -= .5
+
+                        if set["Reps"] >= maxRep:
+                            compoundPoints += 1
+                        
+                        if set["Reps"] >= int(self.repRangeKey[type["Type"]].split("-")[-1]):
+                            nonCompoundPoints+= 1
+                        
+                        if set["Reps"] >= minRep:
+                            compoundPoints += .5
+                            
+                        if set["Reps"] < int(self.repRangeKey[type["Type"]].split("-")[0]):
+                            nonCompoundPoints -= 1
+                else:
+                    compoundPoints -= 2
+                    nonCompoundPoints -=2    
+
+            
+                if type["Type"] == "Full_Compound":    
+                    if compoundPoints < 3:
+                        print(f"Failed")
+                        passFail.append({exercise: "F"})
+                    else:
+                        print("Pass")
+                        passFail.append({exercise: "P"})
+                    
+                else:
+                    if nonCompoundPoints < 3:
+                        print(f"Failed")
+                        passFail.append({exercise: "F"})
+                    else:
+                        print("Pass")
+                        passFail.append({exercise: "P"})
+                        
+        print(passFail)
         for exercise in passFail:
             exerciseName, grade = next(iter(exercise.items()))
             type = self.db.getTypeOfExercise(exerciseName)
@@ -423,16 +508,32 @@ class Coach:
                 
     
     def cycleAllRepRanges(self):
-        pullRepRange = self.pullRepRangeCycle.pop()
+        pullRepRange = self.pullRepRangeCycle.pop(0)
         self.pullRepRangeCycle.append(pullRepRange)
         
-        pushRepRange = self.pushRepRangeCycle.pop()
+        pushRepRange = self.pushRepRangeCycle.pop(0)
         self.pushRepRangeCycle.append(pushRepRange)
         
-        legsRepRange = self.legsRepRangeCycle.pop()
+        legsRepRange = self.legsRepRangeCycle.pop(0)
         self.legsRepRangeCycle.append(legsRepRange)
 
         return pullRepRange, pushRepRange, legsRepRange
+    
+    def newDay(self, pushRepRange, pullRepRange, legsRepRange, todaysRoutine):
+        if self.restDay:
+            self.restDay = False
+            return todaysRoutine
+        else:
+            if todaysRoutine[0] == "Push":
+                self.decideToadysWorkOut(pushRepRange, todaysRoutine)
+            elif todaysRoutine[0] == "Pull":
+                self.decideToadysWorkOut(pullRepRange, todaysRoutine)
+            else:
+                self.decideToadysWorkOut(legsRepRange, todaysRoutine)
+                
+            todaysRoutine = self.cycle.pop(0)
+            self.cycle.append(todaysRoutine)
+            return todaysRoutine
     
     def openLoop(self):
         startHour = 5
@@ -443,39 +544,37 @@ class Coach:
         legsWeekCount = 0
         dayTracker = False
         pullRepRange, pushRepRange, legsRepRange = self.cycleAllRepRanges()
-        todaysRoutine = self.cycle.pop()
-        self.cycle.append(todaysRoutine)
         while True:
             now = datetime.datetime.now()
             
             if now.weekday() == 0 and now.hour == startHour and now.minute == startMinute and not weekTracker:
                 if pullWeekCount == 1:
-                    pullWeekCount = self.moveUpChecker(pullWeekCount, pullRepRange, todaysRoutine)
+                    pullWeekCount = self.moveUpChecker(pullWeekCount, pullRepRange, self.todaysRoutine)
                 elif pullWeekCount == 3:
-                    pullWeekCount = self.moveUpChecker(pullWeekCount, pullRepRange, todaysRoutine)
+                    pullWeekCount = self.moveUpChecker(pullWeekCount, pullRepRange, self.todaysRoutine)
                 elif pullWeekCount == 4:
                     pullWeekCount = 0
-                    pullRepRange = self.pullRepRangeCycle.pop()
+                    pullRepRange = self.pullRepRangeCycle.pop(0)
                     self.pullRepRangeCycle.append(pullRepRange)
                     
                 
                 if pushWeekCount == 1:
-                    pushWeekCount = self.moveUpChecker(pushWeekCount, pushRepRange, todaysRoutine)
+                    pushWeekCount = self.moveUpChecker(pushWeekCount, pushRepRange, self.todaysRoutine)
                 elif pushWeekCount == 3:
-                    pushWeekCount = self.moveUpChecker(pushWeekCount, pushRepRange, todaysRoutine)
+                    pushWeekCount = self.moveUpChecker(pushWeekCount, pushRepRange, self.todaysRoutine)
                 elif pushWeekCount == 4:
                     pushWeekCount = 0
-                    pushRepRange = self.pushRepRangeCycle.pop()
+                    pushRepRange = self.pushRepRangeCycle.pop(0)
                     self.pushRepRangeCycle.append(pushRepRange)
                 
                 
                 if legsWeekCount == 1:
-                    legsWeekCount = self.moveUpChecker(legsWeekCount, legsRepRange, todaysRoutine)
+                    legsWeekCount = self.moveUpChecker(legsWeekCount, legsRepRange, self.todaysRoutine)
                 elif legsWeekCount == 3:
-                    legsWeekCount = self.moveUpChecker(legsWeekCount, legsRepRange, todaysRoutine)
+                    legsWeekCount = self.moveUpChecker(legsWeekCount, legsRepRange, self.todaysRoutine)
                 elif legsWeekCount == 4:
                     legsWeekCount = 0
-                    legsRepRange = self.legsRepRangeCycle.pop()
+                    legsRepRange = self.legsRepRangeCycle.pop(0)
                     self.legsRepRangeCycle.append(legsRepRange)
                 
                 pullWeekCount += 1
@@ -489,15 +588,7 @@ class Coach:
                 weekTracker = False
             
             if now.hour == startHour and now.minute == startMinute and not dayTracker:
-                if todaysRoutine[0] == "Push":
-                    self.decideToadysWorkOut(pushRepRange, todaysRoutine)
-                elif todaysRoutine[0] == "Pull":
-                    self.decideToadysWorkOut(pullRepRange, todaysRoutine)
-                else:
-                    self.decideToadysWorkOut(legsRepRange, todaysRoutine)
-                    
-                todaysRoutine = self.cycle.pop()
-                self.cycle.append(todaysRoutine)
+                self.todaysRoutine = self.newDay(pushRepRange, pullRepRange, legsRepRange, self.todaysRoutine)
                 dayTracker = True
                 time.sleep(60)
             
@@ -505,30 +596,66 @@ class Coach:
                 dayTracker = False
                 
             time.sleep(10)
-        
-        
 
-# Coach().incomingText(
-# """
-# Message from +13477839604: Dead Lifts:
-# 345x6
-# Rows:
-# 155x6
-# 135x8
-# 135x4
-# Pull ups:
-# 8
-# 6
-# 5
-# hammer curls:
-# 30x12
-# 30x6
-# 25x12
-# machine curls:
-# 65x8
-# 60x8
-# 50x10
-# rating:8
-# """)
 
-Coach().openLoop()
+class TextListener:
+    def __init__(self, coach):
+        self.coach = coach
+        self.load_twilio_credentials()
+        self.client = Client(self.sid, self.token)
+        self.last_checked = datetime.datetime.now() - datetime.timedelta(minutes=5)
+        self.message_received_today = False  
+        
+    def load_twilio_credentials(self):
+        from dotenv import load_dotenv
+        import os
+        load_dotenv()
+        self.sid = os.environ.get("SID")
+        self.token = os.environ.get("token")
+        self.twilio_phone_number = os.environ.get("twilloPhoneNumber")
+        self.my_phone_number = os.environ.get("myPhoneNumber")
+    
+    def check_for_incoming_text(self):
+        messages = self.client.messages.list(
+            to=self.twilio_phone_number,
+            date_sent_after=self.last_checked
+        )
+
+        for message in messages:
+            if message.from_ == self.my_phone_number:
+                self.coach.incomingText(message.body)
+                self.message_received_today = True
+                print(f"Processed message: {message.body}")
+
+        self.last_checked = datetime.datetime.now()
+    
+    def manage_daily_routine(self):
+        now = datetime.datetime.now()
+        if now.hour == 4 and now.minute == 0:
+            if not self.message_received_today:
+                print("No text received today. Assuming it was a rest day.")
+                self.coach.setRestDay() 
+
+            self.message_received_today = False
+            time.sleep(60)
+
+    def start_listening(self):
+        while True:
+            self.check_for_incoming_text()
+            self.manage_daily_routine()
+            time.sleep(10) 
+
+
+
+if __name__ == "__main__":
+    coach = Coach()
+    listener = TextListener(coach)
+
+    coach_thread = threading.Thread(target=coach.openLoop, daemon=True)
+    listener_thread = threading.Thread(target=listener.start_listening, daemon=True)
+
+    coach_thread.start()
+    listener_thread.start()
+
+    coach_thread.join()
+    listener_thread.join()  

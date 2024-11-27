@@ -1,14 +1,84 @@
-Bench_Press,Full_Compound,10
-Incline_Dumbbell_Press,Semi_Compound,5
-Chest_Fly,Non_Compound
-Tricep_Pull_Down,Non_Compound
-Plate_Loaded_Shoulder_Press,Semi_Compound,5
-Dead_Lifts,Full_Compound
-Pull_Ups,Body_Weight
-Barbell_Rows,Semi_Compound
-Hammer_Curls,Non_Compound,5
-Machine_Curls,Non_Compound
-Hamstring_Curls,Non_Compound
-Squats,Full_Compound
-Calf_Raises,Non_Compound
-Leg_Extensions,Non_Compound
+{
+  "Date": "11/26/24",
+  "List_of_Workouts": [
+    {
+      "Name": "Dead_Lifts",
+      "Sets": [
+        {
+          "Weight": 345,
+          "Reps": 6
+        }
+      ]
+    },
+    {
+      "Name": "Barbell_Rows",
+      "Sets": [
+        {
+          "Weight": 155,
+          "Reps": 7
+        },
+        {
+          "Weight": 150,
+          "Reps": 6
+        },
+        {
+          "Weight": 145,
+          "Reps": 8
+        }
+      ]
+    },
+    {
+      "Name": "Pull_Ups",
+      "Sets": [
+        {
+          "Weight": 0,
+          "Reps": 7
+        },
+        {
+          "Weight": 0,
+          "Reps": 5
+        },
+        {
+          "Weight": 0,
+          "Reps": 4
+        }
+      ]
+    },
+    {
+      "Name": "Hammer_Curls",
+      "Sets": [
+        {
+          "Weight": 35,
+          "Reps": 10
+        },
+        {
+          "Weight": 30,
+          "Reps": 10
+        },
+        {
+          "Weight": 25,
+          "Reps": 12
+        }
+      ]
+    },
+    {
+      "Name": "Machine_Curls",
+      "Sets": [
+        {
+          "Weight": 65,
+          "Reps": 8
+        },
+        {
+          "Weight": 55,
+          "Reps": 8
+        },
+        {
+          "Weight": 45,
+          "Reps": 12
+        }
+      ]
+    }
+  ],
+  "Rating": 7,
+  "Day": "Pull"
+}
