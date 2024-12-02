@@ -54,13 +54,13 @@ class Set:
         self.reps = reps
         
     def getWeight(self):
-        return self.weight
+        return int(self.weight)
     
     def getReps(self):
-        return self.reps
+        return int(self.reps)
     
     def getJson(self):
-        return {"Weight":self.weight, "Reps":self.reps}
+        return {"Weight":int(self.weight), "Reps":int(self.reps)}
         
     def __str__(self):
         return f"{self.weight} X {self.reps}" 
@@ -145,6 +145,16 @@ class DBController:
         if type(workout) == Session:
             self.workOutsCollection.insert_one(workout.getJson())
             
+    
+    
+    def postNewWorkOut(self, name, type, moveUp):
+        moveUp = int(moveUp)
+        result = self.exerciseCollection.find_one({"Name":name})
+        if not result:
+            self.exerciseCollection.insert_one({"Name":name, "Type": type, "Move_Up_Rate": moveUp, "Move_Up": False})
+        else:
+            print(f"{name} is already in the database updating it")
+            self.exerciseCollection.replace_one({"Name":name}, {"Name":name, "Type": type, "Move_Up_Rate": moveUp, "Move_Up": False}, True)
         
     def loadInExercises(self, textFile):
         with open(textFile) as exercises:
@@ -190,26 +200,59 @@ class Coach:
     db = DBController()
     routine = None
     routineFile = "routine.json"
-    day = "Push"
+    day = None
     todaysRoutine = {}
     
     
     def __init__(self):
         self.loadInRoutine()
-        self.cycle = [["Legs",self.routine["Legs"], ["Push",self.routine["Push"]], ["Pull",self.routine["Pull"]]]]
+        self.cycle = [["Pull",self.routine["Pull"]], ["Push",self.routine["Push"]], ["Legs",self.routine["Legs"]]]
         self.pullRepRangeCycle = ["6-8", "4-6", "2-4"]
         self.pushRepRangeCycle = ["6-8", "4-6", "2-4"]
         self.legsRepRangeCycle = ["6-8", "4-6", "2-4"]
         self.repRangeKey = {"Full_Compound": "4-8", "Semi_Compound": "6-8", "Non_Compound":"10-15", "Body_Weight": "7-12"}
         self.todaysRoutine = self.cycle.pop(0)
         self.cycle.append(self.todaysRoutine)
+        self.day = self.cycle[0][0]
                 
     def loadInRoutine(self):
         with open(self.routineFile, 'r') as file:
             self.routine = json.load(file)
 
+    def changeExerciseInRoutine(self, day, old, new):
+        moveUp = 10
+        type = "Non_Compound"
+        routine = None
+        
+        if "(" in new and ")" in new:
+            split = new.split("(")
+            new = split[0]
+            split = split[1].replace(")", "").split(",")
+            type = split[0]
+            if len(split) > 1:
+                moveUp = split[1]
+        else:
+            print("Not the right format for adding new exersie")
+        
+        
+        self.db.postNewWorkOut(new, type, moveUp)  
+        
+        with open(self.routineFile, 'r') as file:
+            routine = json.load(file)
+        
+        for i in range(len(routine[day])):
+            if routine[day][i] == old:
+                routine[day][i] = new
+        
+        with open(self.routineFile, 'w') as file:
+            json.dump(routine, file)
+        
+        self.loadInRoutine()
+        
+        for i in range(3):
+            temp = self.cycle.pop(0)
+            self.cycle.append([temp[0], self.routine[temp[0]]])  
             
-    
     def logWorkout(self, name, weight, sets, reps):
         workout = Workout(name, weight, sets, reps)
         self.db.postWorkOut(workout)
@@ -305,24 +348,48 @@ class Coach:
                     rating = t.lower().replace("rating:", "")
                     break
                 if "skip" in t.lower():
+                    if name:
+                        if "*" in name[0]:
+                            self.changeExerciseInRoutine(workoutPlan[0], workoutPlan[-1][i], name.replace("*", ""))
+                            workoutPlan = self.cycle[-1]
+                            
+                        if sets:
+                            workouts.append(Workout(workoutPlan[-1][i], sets))
+                            sets = []
+                            i += 1
                     i += 1
                     continue
         
                 if ":" in t:
                     if name:
+                        if "*" in name[0]:
+                            self.changeExerciseInRoutine(workoutPlan[0], workoutPlan[-1][i], name.replace("*", ""))
+                            workoutPlan = self.cycle[-1]
+                            
                         if sets:
                             workouts.append(Workout(workoutPlan[-1][i], sets))
                             sets = []
-                    index = text.find(":")
-                    name = text[:index]
+                            i += 1
+                    index = t.find(":")
+                    if index != -1:
+                        name = t[:index]
                 else:
                     tempSplit = t.split("x")
-                    weight = tempSplit[0]
-                    reps = tempSplit[1]
-                    sets.append(Set(weight, reps))
-                i += 0
+                    if tempSplit:
+                        weight = tempSplit[0]
+                        reps = tempSplit[1]
+                        sets.append(Set(weight, reps))
+                
+        
+        if name:
+            if "*" in name[0]:
+                self.changeExerciseInRoutine(workoutPlan[0], workoutPlan[-1][i], name.replace("*", ""))
+                workoutPlan = self.cycle[-1]
+            if sets:
+                workouts.append(Workout(workoutPlan[-1][i], sets))
+                sets = []
             
-        session = Session(workouts, datetime.datetime.today(), int(rating), self.day)
+        session = Session(workouts, datetime.datetime.today(), int(rating), workoutPlan[0])
         
         self.db.postWorkOut(session)
         return session
@@ -603,8 +670,10 @@ class TextListener:
         self.coach = coach
         self.load_twilio_credentials()
         self.client = Client(self.sid, self.token)
-        self.last_checked = datetime.datetime.now() - datetime.timedelta(minutes=5)
-        self.message_received_today = False  
+        self.last_checked = datetime.datetime.now()
+        self.processed_messages = {}
+        self.message_received_today = False
+        self.started_listening = False  
         
     def load_twilio_credentials(self):
         from dotenv import load_dotenv
@@ -622,13 +691,24 @@ class TextListener:
         )
 
         for message in messages:
-            if message.from_ == self.my_phone_number:
-                self.coach.incomingText(message.body)
+            if self.started_listening and message.sid not in self.processed_messages and message.from_ == self.my_phone_number:
+                self.processed_messages[message.sid] = datetime.datetime.now()
                 self.message_received_today = True
-                print(f"Processed message: {message.body}")
+                if self.started_listening:                
+                    self.coach.incomingText(message.body)
+                    print(f"Processed message: {message.body}")
+                else:
+                    self.started_listening = True  # Set flag to indicate listener is now ready
+                    print("Listener is now actively processing new messages.")
 
         self.last_checked = datetime.datetime.now()
-    
+        self.processed_messages[message.sid] = datetime.datetime.now()
+        
+    def cleanup_processed_messages(self):
+        cutoff_time = datetime.datetime.now() - datetime.timedelta(hours=48)
+        self.processed_messages = {sid: timestamp for sid, timestamp in self.processed_messages.items() if timestamp > cutoff_time}
+        
+
     def manage_daily_routine(self):
         now = datetime.datetime.now()
         if now.hour == 4 and now.minute == 0:
