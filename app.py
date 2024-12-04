@@ -151,10 +151,10 @@ class DBController:
         moveUp = int(moveUp)
         result = self.exerciseCollection.find_one({"Name":name})
         if not result:
-            self.exerciseCollection.insert_one({"Name":name, "Type": type, "Move_Up_Rate": moveUp, "Move_Up": False})
+            self.exerciseCollection.insert_one({"Name":name, "Type": type, "Move_Up_Rate": moveUp, "Move_Up": "S"})
         else:
             print(f"{name} is already in the database updating it")
-            self.exerciseCollection.replace_one({"Name":name}, {"Name":name, "Type": type, "Move_Up_Rate": moveUp, "Move_Up": False}, True)
+            self.exerciseCollection.replace_one({"Name":name}, {"Name":name, "Type": type, "Move_Up_Rate": moveUp, "Move_Up": "S"}, True)
         
     def loadInExercises(self, textFile):
         with open(textFile) as exercises:
@@ -165,10 +165,10 @@ class DBController:
                 if len(splitLine) >= 2:
                     result = self.exerciseCollection.find_one({"Name":splitLine[0]})
                     if not result:
-                        self.exerciseCollection.insert_one({"Name":splitLine[0], "Type": splitLine[1].replace("\n", ""), "Move_Up_Rate": int(splitLine[2]) if len(splitLine) > 2 else 10, "Move_Up": False })
+                        self.exerciseCollection.insert_one({"Name":splitLine[0], "Type": splitLine[1].replace("\n", ""), "Move_Up_Rate": int(splitLine[2]) if len(splitLine) > 2 else 10, "Move_Up": "S" })
                     else:
                         print(f"{splitLine[0]} is already in the database updating it")
-                        self.exerciseCollection.replace_one({"Name":splitLine[0]}, {"Name":splitLine[0], "Type": splitLine[1].replace("\n", ""), "Move_Up_Rate": int(splitLine[2]) if len(splitLine) > 2 else 10, "Move_Up": False }, True)
+                        self.exerciseCollection.replace_one({"Name":splitLine[0]}, {"Name":splitLine[0], "Type": splitLine[1].replace("\n", ""), "Move_Up_Rate": int(splitLine[2]) if len(splitLine) > 2 else 10, "Move_Up": "S" }, True)
                     
     def getAllPastSpecificExercise(self, exercise):
         return self.workOutsCollection.find({ "List_of_Workouts.Name": exercise},{ "List_of_Workouts.$": 1 }, sort=[("_id", -1)])               
@@ -183,18 +183,19 @@ class DBController:
         return self.exerciseCollection.find_one({"Name": exercise})
     
     def setExerciseMoveUpTrue(self, exercise):
-        return self.exerciseCollection.update_one({"Name": exercise}, { "$set": { "Move_Up": True } })
+        return self.exerciseCollection.update_one({"Name": exercise}, { "$set": { "Move_Up": "U" } })
     
     def setExerciseMoveUpFalse(self, exercise):
-        return self.exerciseCollection.update_one({"Name": exercise}, { "$set": { "Move_Up": False } })      
+        return self.exerciseCollection.update_one({"Name": exercise}, { "$set": { "Move_Up": "D" } })      
     
-
+    def setExerciseMoveUpNeural(self, exercise):
+        return self.exerciseCollection.update_one({"Name": exercise}, { "$set": { "Move_Up": "S" } })
+    
 class Coach:
     cycle = []
     pullRepRangeCycle = []
     pushRepRangeCycle = []
     legsRepRangeCycle = []
-    restDay = False
     repRangeKey = {}
     startingPercentage = 0.82
     db = DBController()
@@ -204,9 +205,9 @@ class Coach:
     todaysRoutine = {}
     
     
-    def __init__(self):
+    def __init__(self, textState):
         self.loadInRoutine()
-        self.cycle = [["Pull",self.routine["Pull"]], ["Push",self.routine["Push"]], ["Legs",self.routine["Legs"]]]
+        self.cycle = [["Push",self.routine["Push"]], ["Legs",self.routine["Legs"]], ["Pull",self.routine["Pull"]]]
         self.pullRepRangeCycle = ["6-8", "4-6", "2-4"]
         self.pushRepRangeCycle = ["6-8", "4-6", "2-4"]
         self.legsRepRangeCycle = ["6-8", "4-6", "2-4"]
@@ -214,6 +215,7 @@ class Coach:
         self.todaysRoutine = self.cycle.pop(0)
         self.cycle.append(self.todaysRoutine)
         self.day = self.cycle[0][0]
+        self.textState = textState
                 
     def loadInRoutine(self):
         with open(self.routineFile, 'r') as file:
@@ -257,8 +259,6 @@ class Coach:
         workout = Workout(name, weight, sets, reps)
         self.db.postWorkOut(workout)
     
-    def setRestDay(self):
-        self.restDay = True 
     
     def sendText(self, msg):
         load_dotenv()
@@ -287,26 +287,34 @@ class Coach:
             typeOfExersice = self.db.getTypeOfExercise(workout)
             
             if typeOfExersice["Type"] == "Full_Compound":
-                if typeOfExersice["Move_Up"]:
-                    self.db.setExerciseMoveUpFalse(workout)
+                if typeOfExersice["Move_Up"] == "U":
+                    self.db.setExerciseMoveUpNeural(workout)
                     message += f"Top set of {int(allOldSets[0].getWeight()) + typeOfExersice['Move_Up_Rate']} ==> {repRange}\n"
+                if typeOfExersice["Move_Up"] == "D":
+                    self.db.setExerciseMoveUpNeural(workout)
+                    message += f"Top set of {int(allOldSets[0].getWeight()) - typeOfExersice['Move_Up_Rate']} ==> {repRange}\n"
                 else:
                     message += f"Top set of {int(allOldSets[0].getWeight())} ==> {repRange}\n"
                     
             elif typeOfExersice["Type"] == "Non_Compound":
-                if typeOfExersice["Move_Up"]:
-                    self.db.setExerciseMoveUpFalse(workout)
+                if typeOfExersice["Move_Up"] == "U":
+                    self.db.setExerciseMoveUpNeural(workout)
                     message += f"{int(allOldSets[0].getWeight()) + typeOfExersice['Move_Up_Rate']} ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
-                    message += f"{int(allOldSets[0].getWeight()) + typeOfExersice['Move_Up_Rate']} ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
-                    message += f"{int(allOldSets[0].getWeight()) + typeOfExersice['Move_Up_Rate']} ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
+                    message += f"{int(allOldSets[0].getWeight()) } ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
+                    message += f"{int(allOldSets[0].getWeight()) - typeOfExersice['Move_Up_Rate']} ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
+                elif typeOfExersice["Move_Up"] == "D":
+                    self.db.setExerciseMoveUpNeural(workout)
+                    message += f"{int(allOldSets[0].getWeight())-typeOfExersice['Move_Up_Rate']} ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
+                    message += f"{int(allOldSets[0].getWeight())-(2*typeOfExersice['Move_Up_Rate'])} ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
+                    message += f"{int(allOldSets[0].getWeight())-(2*typeOfExersice['Move_Up_Rate'])} ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
                 else:
                     message += f"{int(allOldSets[0].getWeight())} ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
-                    message += f"{int(allOldSets[0].getWeight())} ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
-                    message += f"{int(allOldSets[0].getWeight())} ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
+                    message += f"{int(allOldSets[0].getWeight()) - typeOfExersice['Move_Up_Rate']} ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
+                    message += f"{int(allOldSets[0].getWeight()) - (2*typeOfExersice['Move_Up_Rate'])} ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
                     
             elif typeOfExersice['Type'] == "Semi_Compound" or typeOfExersice['Type'] == "Body_Weight":
-                if typeOfExersice["Move_Up"]:
-                    self.db.setExerciseMoveUpFalse(workout)
+                if typeOfExersice["Move_Up"] == "U":
+                    self.db.setExerciseMoveUpNeural(workout)
                     if typeOfExersice["Name"] == "Pull_Ups":
                         message += f"0 ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
                         message += f"0 ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
@@ -314,6 +322,17 @@ class Coach:
                     else:
                         message += f"{int(allOldSets[0].getWeight()) + typeOfExersice['Move_Up_Rate']} ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
                         message += f"{int(allOldSets[0].getWeight()) - typeOfExersice['Move_Up_Rate']} ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
+                        message += f"{int(allOldSets[0].getWeight()) - (2*typeOfExersice['Move_Up_Rate'])} ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
+                
+                elif typeOfExersice["Move_Up"] == "D":
+                    self.db.setExerciseMoveUpNeural(workout)
+                    if typeOfExersice["Name"] == "Pull_Ups":
+                        message += f"0 ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
+                        message += f"0 ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
+                        message += f"0 ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
+                    else:
+                        message += f"{int(allOldSets[0].getWeight()) - typeOfExersice['Move_Up_Rate']} ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
+                        message += f"{int(allOldSets[0].getWeight()) - (2*typeOfExersice['Move_Up_Rate'])} ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
                         message += f"{int(allOldSets[0].getWeight()) - (2*typeOfExersice['Move_Up_Rate'])} ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
                 else:
                     if typeOfExersice["Name"] == "Pull_Ups":
@@ -374,8 +393,16 @@ class Coach:
                     if index != -1:
                         name = t[:index]
                 else:
-                    tempSplit = t.split("x")
-                    if tempSplit:
+                    if "x" in t:
+                        tempSplit = t.split("x")
+                    elif "-" in t:
+                        tempSplit = t.split("-")
+                    elif "/" in t:
+                        tempSplit = t.split("/")
+                    else:
+                        tempSplit = t.split(" ")
+                        
+                    if tempSplit and len(tempSplit) > 1:
                         weight = tempSplit[0]
                         reps = tempSplit[1]
                         sets.append(Set(weight, reps))
@@ -542,20 +569,26 @@ class Coach:
 
             
                 if type["Type"] == "Full_Compound":    
-                    if compoundPoints < 3:
-                        print(f"Failed")
-                        passFail.append({exercise: "F"})
-                    else:
-                        print("Pass")
+                    if compoundPoints >= 3:
+                        print(f"Pass")
                         passFail.append({exercise: "P"})
+                    elif compoundPoints <= 1.5:
+                        print("Fail +")
+                        passFail.append({exercise: "F+"})
+                    else:
+                        print("Fail")
+                        passFail.append({exercise: "F"})
                     
                 else:
-                    if nonCompoundPoints < 3:
-                        print(f"Failed")
-                        passFail.append({exercise: "F"})
-                    else:
-                        print("Pass")
+                    if nonCompoundPoints >= 3:
+                        print(f"Pass")
                         passFail.append({exercise: "P"})
+                    elif compoundPoints <= 1.5:
+                        print("Fail +")
+                        passFail.append({exercise: "F+"})
+                    else:
+                        print("Fail")
+                        passFail.append({exercise: "F"})
                         
         print(passFail)
         for exercise in passFail:
@@ -566,6 +599,8 @@ class Coach:
                 
             if grade == "P":
                 self.db.setExerciseMoveUpTrue(exerciseName)
+            if grade == "F+":
+                self.db.setExerciseMoveUpFalse(exerciseName)
         
         
         if holdBack:
@@ -586,35 +621,35 @@ class Coach:
 
         return pullRepRange, pushRepRange, legsRepRange
     
-    def newDay(self, pushRepRange, pullRepRange, legsRepRange, todaysRoutine):
-        if self.restDay:
-            self.restDay = False
-            return todaysRoutine
-        else:
-            if todaysRoutine[0] == "Push":
-                self.decideToadysWorkOut(pushRepRange, todaysRoutine)
-            elif todaysRoutine[0] == "Pull":
-                self.decideToadysWorkOut(pullRepRange, todaysRoutine)
-            else:
-                self.decideToadysWorkOut(legsRepRange, todaysRoutine)
-                
+    def newDay(self, pushRepRange, pullRepRange, legsRepRange, todaysRoutine, pastDayWasARestDay=False):
+        if not pastDayWasARestDay:
             todaysRoutine = self.cycle.pop(0)
             self.cycle.append(todaysRoutine)
-            return todaysRoutine
+        
+        if todaysRoutine[0] == "Push":
+            self.decideToadysWorkOut(pushRepRange, todaysRoutine)
+        elif todaysRoutine[0] == "Pull":
+            self.decideToadysWorkOut(pullRepRange, todaysRoutine)
+        else:
+            self.decideToadysWorkOut(legsRepRange, todaysRoutine)
+        
+        return todaysRoutine
     
     def openLoop(self):
         startHour = 5
         startMinute = 30
-        weekTracker = False 
-        pullWeekCount = 0
-        pushWeekCount = 0
-        legsWeekCount = 0
+        weekTracker = False
+        pullWeekCount = 1
+        pushWeekCount = 1
+        legsWeekCount = 1
         dayTracker = False
         pullRepRange, pushRepRange, legsRepRange = self.cycleAllRepRanges()
+        last_day_processed = None
         while True:
             now = datetime.datetime.now()
             
             if now.weekday() == 0 and now.hour == startHour and now.minute == startMinute and not weekTracker:
+                print(f"New Week")
                 if pullWeekCount == 1:
                     pullWeekCount = self.moveUpChecker(pullWeekCount, pullRepRange, self.todaysRoutine)
                 elif pullWeekCount == 3:
@@ -649,31 +684,57 @@ class Coach:
                 legsWeekCount += 1
                 weekTracker = True
                 time.sleep(60)
-
+                
             # Reset weekly flag on any day other than the first day of the week
             if now.weekday() != 0:
                 weekTracker = False
             
-            if now.hour == startHour and now.minute == startMinute and not dayTracker:
-                self.todaysRoutine = self.newDay(pushRepRange, pullRepRange, legsRepRange, self.todaysRoutine)
-                dayTracker = True
+            if now.hour == startHour and now.minute == startMinute and (last_day_processed is None or last_day_processed != now.date()):
+                print("New Day")
+                if self.textState.getState():
+                    print("Deciding new Workout")
+                    self.todaysRoutine = self.newDay(pushRepRange, pullRepRange, legsRepRange, self.todaysRoutine, pastDayWasARestDay=False)
+                    
+                else:
+                    print("I See We Resting Now Loser")
+                    print("Got No Text Message Assuming it was a Rest Day")
+                    self.todaysRoutine = self.newDay(pushRepRange, pullRepRange, legsRepRange, self.todaysRoutine, pastDayWasARestDay=True)
+                    
+                
+                self.textState.resetTextState()
+                last_day_processed = now.date() 
+                
                 time.sleep(60)
+                 
             
-            if now.hour == 0 and now.minute == 0:
-                dayTracker = False
                 
             time.sleep(10)
-
-
+    
+            
+class TextState:
+    def __init__(self):
+        self._gotText = False
+    
+    def gotText(self):
+        self._gotText = True  
+    
+    def resetTextState(self):
+        self._gotText = False
+        
+    def getState(self):
+        return self._gotText
+    
 class TextListener:
-    def __init__(self, coach):
+    def __init__(self, coach, textState):
         self.coach = coach
+        self.textState = textState
+        #Twillo api sends there texts in UTC time have to convert to EST
+        self.timeOffset = 5
         self.load_twilio_credentials()
         self.client = Client(self.sid, self.token)
         self.last_checked = datetime.datetime.now()
-        self.processed_messages = {}
-        self.message_received_today = False
-        self.started_listening = False  
+        self.processed_messages = set()
+        self.dayCount = 0 
         
     def load_twilio_credentials(self):
         from dotenv import load_dotenv
@@ -687,49 +748,36 @@ class TextListener:
     def check_for_incoming_text(self):
         messages = self.client.messages.list(
             to=self.twilio_phone_number,
-            date_sent_after=self.last_checked
+            date_sent_after=(self.last_checked + datetime.timedelta(hours=self.timeOffset))
         )
 
         for message in messages:
-            if self.started_listening and message.sid not in self.processed_messages and message.from_ == self.my_phone_number:
-                self.processed_messages[message.sid] = datetime.datetime.now()
-                self.message_received_today = True
-                if self.started_listening:                
-                    self.coach.incomingText(message.body)
-                    print(f"Processed message: {message.body}")
-                else:
-                    self.started_listening = True  # Set flag to indicate listener is now ready
-                    print("Listener is now actively processing new messages.")
-
+            print(f"Checking message SID: {message.sid}, From: {message.from_}, Body: {message.body}")
+            if message.sid not in self.processed_messages and message.from_ == self.my_phone_number:
+                self.processed_messages.add(message.sid)
+                self.textState.gotText()
+                self.coach.incomingText(message.body)
+                print(f"Processed message: {message.body}")
+              
         self.last_checked = datetime.datetime.now()
-        self.processed_messages[message.sid] = datetime.datetime.now()
+        self.cleanup_processed_messages()
         
     def cleanup_processed_messages(self):
-        cutoff_time = datetime.datetime.now() - datetime.timedelta(hours=48)
-        self.processed_messages = {sid: timestamp for sid, timestamp in self.processed_messages.items() if timestamp > cutoff_time}
-        
-
-    def manage_daily_routine(self):
-        now = datetime.datetime.now()
-        if now.hour == 4 and now.minute == 0:
-            if not self.message_received_today:
-                print("No text received today. Assuming it was a rest day.")
-                self.coach.setRestDay() 
-
-            self.message_received_today = False
-            time.sleep(60)
+        if self.dayCount == 2:
+            self.dayCount = 0    
+            self.processed_messages = set()
 
     def start_listening(self):
         while True:
             self.check_for_incoming_text()
-            self.manage_daily_routine()
             time.sleep(10) 
 
 
 
 if __name__ == "__main__":
-    coach = Coach()
-    listener = TextListener(coach)
+    textState = TextState() 
+    coach = Coach(textState)
+    listener = TextListener(coach, textState)
 
     coach_thread = threading.Thread(target=coach.openLoop, daemon=True)
     listener_thread = threading.Thread(target=listener.start_listening, daemon=True)
