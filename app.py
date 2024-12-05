@@ -9,7 +9,12 @@ import time
 import threading
 from fuzzywuzzy import fuzz
 from fuzzywuzzy import process
+from enum import Enum
 
+class MoveUp(Enum):
+    UP = "U"
+    DOWN = "D"
+    STAY = "S"
 
 class Session:
     workouts = []
@@ -153,10 +158,10 @@ class DBController:
         moveUp = int(moveUp)
         result = self.exerciseCollection.find_one({"Name":name})
         if not result:
-            self.exerciseCollection.insert_one({"Name":name, "Type": type, "Move_Up_Rate": moveUp, "Move_Up": "S", "Weight":int(weight)})
+            self.exerciseCollection.insert_one({"Name":name, "Type": type, "Move_Up_Rate": moveUp, "Move_Up": MoveUp.STAY.value, "Weight":int(weight)})
         else:
             print(f"{name} is already in the database updating it")
-            self.exerciseCollection.replace_one({"Name":name}, {"Name":name, "Type": type, "Move_Up_Rate": moveUp, "Move_Up": "S", "Weight":int(weight)}, True)
+            self.exerciseCollection.replace_one({"Name":name}, {"Name":name, "Type": type, "Move_Up_Rate": moveUp, "Move_Up": MoveUp.STAY.value, "Weight":int(weight)}, True)
         
     def loadInExercises(self, textFile):
         with open(textFile) as exercises:
@@ -167,10 +172,10 @@ class DBController:
                 if len(splitLine) >= 2:
                     result = self.exerciseCollection.find_one({"Name":splitLine[0]})
                     if not result:
-                        self.exerciseCollection.insert_one({"Name":splitLine[0], "Type": splitLine[1].replace("\n", ""), "Move_Up_Rate": int(splitLine[2]) if len(splitLine) > 2 else 10, "Move_Up": "S", "Weight":int(splitLine[3])})
+                        self.exerciseCollection.insert_one({"Name":splitLine[0], "Type": splitLine[1].replace("\n", ""), "Move_Up_Rate": int(splitLine[2]) if len(splitLine) > 2 else 10, "Move_Up": MoveUp.STAY.value, "Weight":int(splitLine[3])})
                     else:
                         print(f"{splitLine[0]} is already in the database updating it")
-                        self.exerciseCollection.replace_one({"Name":splitLine[0]}, {"Name":splitLine[0], "Type": splitLine[1].replace("\n", ""), "Move_Up_Rate": int(splitLine[2]) if len(splitLine) > 2 else 10, "Move_Up": "S", "Weight":int(splitLine[3]) }, True)
+                        self.exerciseCollection.replace_one({"Name":splitLine[0]}, {"Name":splitLine[0], "Type": splitLine[1].replace("\n", ""), "Move_Up_Rate": int(splitLine[2]) if len(splitLine) > 2 else 10, "Move_Up": MoveUp.STAY.value, "Weight":int(splitLine[3]) }, True)
                     
     def getAllPastSpecificExercise(self, exercise):
         return self.workOutsCollection.find({ "List_of_Workouts.Name": exercise},{ "List_of_Workouts.$": 1 }, sort=[("_id", -1)])               
@@ -185,13 +190,13 @@ class DBController:
         return self.exerciseCollection.find_one({"Name": exercise})
     
     def setExerciseMoveUpTrue(self, exercise):
-        return self.exerciseCollection.update_one({"Name": exercise}, { "$set": { "Move_Up": "U" } })
+        return self.exerciseCollection.update_one({"Name": exercise}, { "$set": { "Move_Up": MoveUp.UP.value } })
     
     def setExerciseMoveUpFalse(self, exercise):
-        return self.exerciseCollection.update_one({"Name": exercise}, { "$set": { "Move_Up": "D" } })      
+        return self.exerciseCollection.update_one({"Name": exercise}, { "$set": { "Move_Up": MoveUp.DOWN.value } })      
     
     def setExerciseMoveUpNeural(self, exercise):
-        return self.exerciseCollection.update_one({"Name": exercise}, { "$set": { "Move_Up": "S" } })
+        return self.exerciseCollection.update_one({"Name": exercise}, { "$set": { "Move_Up": MoveUp.STAY.value } })
     
     def setExerciseWeight(self, exercise, newWeight):
         return self.exerciseCollection.update_one({"Name": exercise}, { "$set": { "Weight": int(newWeight) } })
@@ -292,11 +297,11 @@ class Coach:
             
             if typeOfExersice["Type"] == "Full_Compound":
                 
-                if typeOfExersice["Move_Up"] == "U":
+                if typeOfExersice["Move_Up"] == MoveUp.UP.value:
                     message += f"Top set of {typeOfExersice['Weight'] + typeOfExersice['Move_Up_Rate']} ==> {repRange}\n"
                     self.db.setExerciseWeight(typeOfExersice["Name"], typeOfExersice['Weight'] + typeOfExersice['Move_Up_Rate'])
                     self.db.setExerciseMoveUpNeural(workout)
-                elif typeOfExersice["Move_Up"] == "D":
+                elif typeOfExersice["Move_Up"] == MoveUp.DOWN.value:
                     message += f"Top set of {typeOfExersice['Weight'] - typeOfExersice['Move_Up_Rate']} ==> {repRange}\n"
                     self.db.setExerciseWeight(typeOfExersice["Name"], typeOfExersice['Weight'] - typeOfExersice['Move_Up_Rate'])
                     self.db.setExerciseMoveUpNeural(workout)
@@ -304,13 +309,13 @@ class Coach:
                     message += f"Top set of {typeOfExersice['Weight']} ==> {repRange}\n"
                     
             elif typeOfExersice["Type"] == "Non_Compound":
-                if typeOfExersice["Move_Up"] == "U":
+                if typeOfExersice["Move_Up"] == MoveUp.UP.value:
                     message += f"{typeOfExersice['Weight'] + typeOfExersice['Move_Up_Rate']} ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
                     message += f"{typeOfExersice['Weight']} ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
                     message += f"{typeOfExersice['Weight'] - (2*typeOfExersice['Move_Up_Rate'])} ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
                     self.db.setExerciseWeight(typeOfExersice["Name"], typeOfExersice['Weight'] + typeOfExersice['Move_Up_Rate'])
                     self.db.setExerciseMoveUpNeural(workout)
-                elif typeOfExersice["Move_Up"] == "D":
+                elif typeOfExersice["Move_Up"] == MoveUp.DOWN.value:
                     message += f"{typeOfExersice['Weight']-typeOfExersice['Move_Up_Rate']} ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
                     message += f"{typeOfExersice['Weight']-(2*typeOfExersice['Move_Up_Rate'])} ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
                     message += f"{typeOfExersice['Weight']-(2*typeOfExersice['Move_Up_Rate'])} ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
@@ -322,7 +327,7 @@ class Coach:
                     message += f"{typeOfExersice['Weight'] - (2*typeOfExersice['Move_Up_Rate'])} ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
                     
             elif typeOfExersice['Type'] == "Semi_Compound" or typeOfExersice['Type'] == "Body_Weight":
-                if typeOfExersice["Move_Up"] == "U":
+                if typeOfExersice["Move_Up"] == MoveUp.UP.value:
                     if typeOfExersice["Name"] == "Pull_Ups":
                         message += f"0 ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
                         message += f"0 ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
@@ -333,7 +338,7 @@ class Coach:
                         message += f"{typeOfExersice['Weight'] - (2*typeOfExersice['Move_Up_Rate'])} ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
                     self.db.setExerciseWeight(typeOfExersice["Name"], typeOfExersice['Weight'] + typeOfExersice['Move_Up_Rate'])
                     self.db.setExerciseMoveUpNeural(workout)
-                elif typeOfExersice["Move_Up"] == "D":
+                elif typeOfExersice["Move_Up"] == MoveUp.DOWN.value:
                     if typeOfExersice["Name"] == "Pull_Ups":
                         message += f"0 ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
                         message += f"0 ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
