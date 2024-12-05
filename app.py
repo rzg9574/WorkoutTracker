@@ -444,7 +444,7 @@ class Coach:
             
         session = Session(workouts, datetime.datetime.today(), int(rating), workoutPlan[0])
         
-        #self.db.postWorkOut(session)
+        self.db.postWorkOut(session)
         print(session)
         return session
     
