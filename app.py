@@ -122,7 +122,7 @@ class DBController:
         
         workouts = []
         for workout in response["List_of_Workouts"]:
-            workouts.append(Workout(workout["Name"],[Set(s["Weight"], s["Reps"]) for s in workout["Sets"]]))
+            workouts.append(Workout(workout["Name"],[Set(s['Weight'], s["Reps"]) for s in workout["Sets"]]))
 
         session = Session(workouts, response["Date"], response["Rating"], response["Day"])
         
@@ -134,7 +134,7 @@ class DBController:
         for response in responses:
             workouts = []
             for workout in response["List_of_Workouts"]:
-                workouts.append(Workout(workout["Name"],[Set(s["Weight"], s["Reps"]) for s in workout["Sets"]]))
+                workouts.append(Workout(workout["Name"],[Set(s['Weight'], s["Reps"]) for s in workout["Sets"]]))
 
             session = Session(workouts, response["Date"], response["Rating"], response["Day"])
             sessions.append(session)
@@ -147,14 +147,14 @@ class DBController:
             
     
     
-    def postNewWorkOut(self, name, type, moveUp):
+    def postNewWorkOut(self, name, type, moveUp, weight):
         moveUp = int(moveUp)
         result = self.exerciseCollection.find_one({"Name":name})
         if not result:
-            self.exerciseCollection.insert_one({"Name":name, "Type": type, "Move_Up_Rate": moveUp, "Move_Up": "S"})
+            self.exerciseCollection.insert_one({"Name":name, "Type": type, "Move_Up_Rate": moveUp, "Move_Up": "S", "Weight":int(weight)})
         else:
             print(f"{name} is already in the database updating it")
-            self.exerciseCollection.replace_one({"Name":name}, {"Name":name, "Type": type, "Move_Up_Rate": moveUp, "Move_Up": "S"}, True)
+            self.exerciseCollection.replace_one({"Name":name}, {"Name":name, "Type": type, "Move_Up_Rate": moveUp, "Move_Up": "S", "Weight":int(weight)}, True)
         
     def loadInExercises(self, textFile):
         with open(textFile) as exercises:
@@ -165,10 +165,10 @@ class DBController:
                 if len(splitLine) >= 2:
                     result = self.exerciseCollection.find_one({"Name":splitLine[0]})
                     if not result:
-                        self.exerciseCollection.insert_one({"Name":splitLine[0], "Type": splitLine[1].replace("\n", ""), "Move_Up_Rate": int(splitLine[2]) if len(splitLine) > 2 else 10, "Move_Up": "S" })
+                        self.exerciseCollection.insert_one({"Name":splitLine[0], "Type": splitLine[1].replace("\n", ""), "Move_Up_Rate": int(splitLine[2]) if len(splitLine) > 2 else 10, "Move_Up": "S", "Weight":int(splitLine[3])})
                     else:
                         print(f"{splitLine[0]} is already in the database updating it")
-                        self.exerciseCollection.replace_one({"Name":splitLine[0]}, {"Name":splitLine[0], "Type": splitLine[1].replace("\n", ""), "Move_Up_Rate": int(splitLine[2]) if len(splitLine) > 2 else 10, "Move_Up": "S" }, True)
+                        self.exerciseCollection.replace_one({"Name":splitLine[0]}, {"Name":splitLine[0], "Type": splitLine[1].replace("\n", ""), "Move_Up_Rate": int(splitLine[2]) if len(splitLine) > 2 else 10, "Move_Up": "S", "Weight":int(splitLine[3]) }, True)
                     
     def getAllPastSpecificExercise(self, exercise):
         return self.workOutsCollection.find({ "List_of_Workouts.Name": exercise},{ "List_of_Workouts.$": 1 }, sort=[("_id", -1)])               
@@ -191,6 +191,9 @@ class DBController:
     def setExerciseMoveUpNeural(self, exercise):
         return self.exerciseCollection.update_one({"Name": exercise}, { "$set": { "Move_Up": "S" } })
     
+    def setExerciseWeight(self, exercise, newWeight):
+        return self.exerciseCollection.update_one({"Name": exercise}, { "$set": { "Weight": int(newWeight) } })
+    
 class Coach:
     cycle = []
     pullRepRangeCycle = []
@@ -202,18 +205,17 @@ class Coach:
     routine = None
     routineFile = "routine.json"
     day = None
-    todaysRoutine = {}
+    todaysRoutine = []
     
     
     def __init__(self, textState):
         self.loadInRoutine()
-        self.cycle = [["Push",self.routine["Push"]], ["Legs",self.routine["Legs"]], ["Pull",self.routine["Pull"]]]
+        self.cycle = [["Legs",self.routine["Legs"]], ["Pull",self.routine["Pull"]], ["Push",self.routine["Push"]]]
         self.pullRepRangeCycle = ["6-8", "4-6", "2-4"]
         self.pushRepRangeCycle = ["6-8", "4-6", "2-4"]
         self.legsRepRangeCycle = ["6-8", "4-6", "2-4"]
         self.repRangeKey = {"Full_Compound": "4-8", "Semi_Compound": "6-8", "Non_Compound":"10-15", "Body_Weight": "7-12"}
-        self.todaysRoutine = self.cycle.pop(0)
-        self.cycle.append(self.todaysRoutine)
+        self.todaysRoutine = self.cycle[0]
         self.day = self.cycle[0][0]
         self.textState = textState
                 
@@ -225,19 +227,24 @@ class Coach:
         moveUp = 10
         type = "Non_Compound"
         routine = None
+        weight = 0
         
         if "(" in new and ")" in new:
             split = new.split("(")
             new = split[0]
             split = split[1].replace(")", "").split(",")
             type = split[0]
-            if len(split) > 1:
+            if len(split) > 2:
                 moveUp = split[1]
+                weight = split[2]
+            else:
+                print("Not the right format you need to tell me the move up rate and the weight your currently doing")
+                return
         else:
-            print("Not the right format for adding new exersie")
+            print("Not the right format for adding new exersie Use ()")
+            return
         
-        
-        self.db.postNewWorkOut(new, type, moveUp)  
+        self.db.postNewWorkOut(new, type, moveUp, weight)  
         
         with open(self.routineFile, 'r') as file:
             routine = json.load(file)
@@ -279,70 +286,71 @@ class Coach:
         message = "Do This Today:\n"
         for workout in todaysRoutine[1]:
             message += f"{workout}:\n"
-            allOldSets = []
-            oldSessions = self.db.getAllPastSpecificExercise(workout)
-            for session in oldSessions:
-                allOldSets.append(Set(session["List_of_Workouts"][0]["Sets"][0]["Weight"], session["List_of_Workouts"][0]["Sets"][0]["Reps"]))
-
             typeOfExersice = self.db.getTypeOfExercise(workout)
             
             if typeOfExersice["Type"] == "Full_Compound":
+                
                 if typeOfExersice["Move_Up"] == "U":
+                    message += f"Top set of {typeOfExersice['Weight'] + typeOfExersice['Move_Up_Rate']} ==> {repRange}\n"
+                    self.db.setExerciseWeight(typeOfExersice["Name"], typeOfExersice['Weight'] + typeOfExersice['Move_Up_Rate'])
                     self.db.setExerciseMoveUpNeural(workout)
-                    message += f"Top set of {int(allOldSets[0].getWeight()) + typeOfExersice['Move_Up_Rate']} ==> {repRange}\n"
-                if typeOfExersice["Move_Up"] == "D":
+                elif typeOfExersice["Move_Up"] == "D":
+                    message += f"Top set of {typeOfExersice['Weight'] - typeOfExersice['Move_Up_Rate']} ==> {repRange}\n"
+                    self.db.setExerciseWeight(typeOfExersice["Name"], typeOfExersice['Weight'] - typeOfExersice['Move_Up_Rate'])
                     self.db.setExerciseMoveUpNeural(workout)
-                    message += f"Top set of {int(allOldSets[0].getWeight()) - typeOfExersice['Move_Up_Rate']} ==> {repRange}\n"
                 else:
-                    message += f"Top set of {int(allOldSets[0].getWeight())} ==> {repRange}\n"
+                    message += f"Top set of {typeOfExersice['Weight']} ==> {repRange}\n"
                     
             elif typeOfExersice["Type"] == "Non_Compound":
                 if typeOfExersice["Move_Up"] == "U":
+                    message += f"{typeOfExersice['Weight'] + typeOfExersice['Move_Up_Rate']} ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
+                    message += f"{typeOfExersice['Weight']} ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
+                    message += f"{typeOfExersice['Weight'] - (2*typeOfExersice['Move_Up_Rate'])} ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
+                    self.db.setExerciseWeight(typeOfExersice["Name"], typeOfExersice['Weight'] + typeOfExersice['Move_Up_Rate'])
                     self.db.setExerciseMoveUpNeural(workout)
-                    message += f"{int(allOldSets[0].getWeight()) + typeOfExersice['Move_Up_Rate']} ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
-                    message += f"{int(allOldSets[0].getWeight()) } ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
-                    message += f"{int(allOldSets[0].getWeight()) - typeOfExersice['Move_Up_Rate']} ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
                 elif typeOfExersice["Move_Up"] == "D":
+                    message += f"{typeOfExersice['Weight']-typeOfExersice['Move_Up_Rate']} ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
+                    message += f"{typeOfExersice['Weight']-(2*typeOfExersice['Move_Up_Rate'])} ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
+                    message += f"{typeOfExersice['Weight']-(2*typeOfExersice['Move_Up_Rate'])} ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
+                    self.db.setExerciseWeight(typeOfExersice["Name"], typeOfExersice['Weight'] - typeOfExersice['Move_Up_Rate'])
                     self.db.setExerciseMoveUpNeural(workout)
-                    message += f"{int(allOldSets[0].getWeight())-typeOfExersice['Move_Up_Rate']} ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
-                    message += f"{int(allOldSets[0].getWeight())-(2*typeOfExersice['Move_Up_Rate'])} ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
-                    message += f"{int(allOldSets[0].getWeight())-(2*typeOfExersice['Move_Up_Rate'])} ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
                 else:
-                    message += f"{int(allOldSets[0].getWeight())} ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
-                    message += f"{int(allOldSets[0].getWeight()) - typeOfExersice['Move_Up_Rate']} ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
-                    message += f"{int(allOldSets[0].getWeight()) - (2*typeOfExersice['Move_Up_Rate'])} ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
+                    message += f"{typeOfExersice['Weight']} ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
+                    message += f"{typeOfExersice['Weight'] - typeOfExersice['Move_Up_Rate']} ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
+                    message += f"{typeOfExersice['Weight'] - (2*typeOfExersice['Move_Up_Rate'])} ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
                     
             elif typeOfExersice['Type'] == "Semi_Compound" or typeOfExersice['Type'] == "Body_Weight":
                 if typeOfExersice["Move_Up"] == "U":
-                    self.db.setExerciseMoveUpNeural(workout)
                     if typeOfExersice["Name"] == "Pull_Ups":
                         message += f"0 ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
                         message += f"0 ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
                         message += f"0 ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
                     else:
-                        message += f"{int(allOldSets[0].getWeight()) + typeOfExersice['Move_Up_Rate']} ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
-                        message += f"{int(allOldSets[0].getWeight()) - typeOfExersice['Move_Up_Rate']} ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
-                        message += f"{int(allOldSets[0].getWeight()) - (2*typeOfExersice['Move_Up_Rate'])} ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
-                
+                        message += f"{typeOfExersice['Weight'] + typeOfExersice['Move_Up_Rate']} ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
+                        message += f"{typeOfExersice['Weight'] - typeOfExersice['Move_Up_Rate']} ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
+                        message += f"{typeOfExersice['Weight'] - (2*typeOfExersice['Move_Up_Rate'])} ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
+                    self.db.setExerciseWeight(typeOfExersice["Name"], typeOfExersice['Weight'] + typeOfExersice['Move_Up_Rate'])
+                    self.db.setExerciseMoveUpNeural(workout)
                 elif typeOfExersice["Move_Up"] == "D":
-                    self.db.setExerciseMoveUpNeural(workout)
                     if typeOfExersice["Name"] == "Pull_Ups":
                         message += f"0 ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
                         message += f"0 ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
                         message += f"0 ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
                     else:
-                        message += f"{int(allOldSets[0].getWeight()) - typeOfExersice['Move_Up_Rate']} ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
-                        message += f"{int(allOldSets[0].getWeight()) - (2*typeOfExersice['Move_Up_Rate'])} ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
-                        message += f"{int(allOldSets[0].getWeight()) - (2*typeOfExersice['Move_Up_Rate'])} ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
+                        message += f"{typeOfExersice['Weight'] - typeOfExersice['Move_Up_Rate']} ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
+                        message += f"{typeOfExersice['Weight'] - (2*typeOfExersice['Move_Up_Rate'])} ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
+                        message += f"{typeOfExersice['Weight'] - (2*typeOfExersice['Move_Up_Rate'])} ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
+                    self.db.setExerciseWeight(typeOfExersice["Name"], typeOfExersice['Weight'] + typeOfExersice['Move_Up_Rate'])
+                    self.db.setExerciseMoveUpNeural(workout)
                 else:
                     if typeOfExersice["Name"] == "Pull_Ups":
                         message += f"0 ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
                         message += f"0 ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
                         message += f"0 ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
                     else:
-                        message += f"{int(allOldSets[0].getWeight())} ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
-                        message += f"{int(allOldSets[0].getWeight())} ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
-                        message += f"{int(allOldSets[0].getWeight()) - typeOfExersice['Move_Up_Rate']} ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
+                        message += f"{typeOfExersice['Weight']} ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
+                        message += f"{typeOfExersice['Weight']} ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
+                        message += f"{typeOfExersice['Weight'] - typeOfExersice['Move_Up_Rate']} ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
         
         self.sendText(message)
         print(message)
@@ -471,7 +479,7 @@ class Coach:
                     autoFail = False
                     for set in firstSet:
                         if set["Reps"] < minRep:
-                            passFail.append({exercise: "F"})
+                            passFail.append({exercise: ["F", set]})
                             autoFail = True
                             break
                         if set["Reps"] >= maxRep:
@@ -483,11 +491,8 @@ class Coach:
                         if set["Reps"] > minRep:
                             deadliftPoints += 1
                             
-
                     if autoFail:
                         continue
-                    
-                    
                 else:
                     print("Failed")
                     passFail.append({exercise: "F"})
@@ -504,11 +509,19 @@ class Coach:
             else:          
                 if firstSet:
                     autoFail = False
-                    for set in firstSet:
+                    for set in firstSet: 
                         if set["Reps"] < minRep:
-                            passFail.append({exercise: "F"})
+                            passFail.append({exercise: ["F", set]})
                             autoFail = True
                             break
+                        if int(set['Weight']) >= int(type['Weight']):
+                            compoundPoints += 0.5
+                            nonCompoundPoints += 0.5
+                        
+                        if int(set['Weight']) < int(type['Weight']):
+                            compoundPoints -= 1
+                            nonCompoundPoints -= 1
+                            
                         if set["Reps"] >= maxRep:
                             compoundPoints += 1
                             
@@ -533,6 +546,13 @@ class Coach:
                         if set["Reps"] < minRep:
                             compoundPoints -= 1
                         
+                        if int(set['Weight']) >= int(type['Weight']) and set["Reps"] >= int(self.repRangeKey[type["Type"]].split("-")[0]):
+                            compoundPoints += 0.5
+                            nonCompoundPoints += 0.5
+                        
+                        if int(set['Weight']) < int(type['Weight']) - 20:
+                            nonCompoundPoints -= 1
+                        
                         if set["Reps"] >= maxRep:
                             compoundPoints += 1
                         
@@ -551,6 +571,13 @@ class Coach:
                     for set in lastSet:
                         if set["Reps"] < minRep:
                             compoundPoints -= .5
+                        
+                        if int(set['Weight']) >= int(type['Weight']) and set["Reps"] >= int(self.repRangeKey[type["Type"]].split("-")[0]):
+                            compoundPoints += 0.5
+                            nonCompoundPoints += 0.5
+                        
+                        if int(set['Weight']) < int(type['Weight']) - 20:
+                            nonCompoundPoints -= 1
 
                         if set["Reps"] >= maxRep:
                             compoundPoints += 1
@@ -569,41 +596,42 @@ class Coach:
 
             
                 if type["Type"] == "Full_Compound":    
-                    if compoundPoints >= 3:
+                    if compoundPoints >= 4:
                         print(f"Pass")
-                        passFail.append({exercise: "P"})
-                    elif compoundPoints <= 1.5:
+                        passFail.append({exercise: ["P", compoundPoints]})
+                    elif compoundPoints < 3:
                         print("Fail +")
-                        passFail.append({exercise: "F+"})
+                        passFail.append({exercise: ["F+", compoundPoints]})
                     else:
                         print("Fail")
-                        passFail.append({exercise: "F"})
+                        passFail.append({exercise: ["F", compoundPoints]})
                     
                 else:
-                    if nonCompoundPoints >= 3:
+                    if nonCompoundPoints >= 4:
                         print(f"Pass")
-                        passFail.append({exercise: "P"})
-                    elif compoundPoints <= 1.5:
+                        passFail.append({exercise: ["P", nonCompoundPoints]})
+                    elif nonCompoundPoints <= 3:
                         print("Fail +")
-                        passFail.append({exercise: "F+"})
+                        passFail.append({exercise: ["F+", nonCompoundPoints] })
                     else:
                         print("Fail")
-                        passFail.append({exercise: "F"})
+                        passFail.append({exercise: ["F", nonCompoundPoints]})
                         
         print(passFail)
         for exercise in passFail:
             exerciseName, grade = next(iter(exercise.items()))
             type = self.db.getTypeOfExercise(exerciseName)
-            if type["Type"] == "Full_Compound" and grade == "F":
+            if type["Type"] == "Full_Compound" and grade[0] == "F":
                 holdBack = True
                 
-            if grade == "P":
+            if grade[0] == "P":
                 self.db.setExerciseMoveUpTrue(exerciseName)
-            if grade == "F+":
+            if grade[0] == "F+":
                 self.db.setExerciseMoveUpFalse(exerciseName)
         
         
         if holdBack:
+            print("Hold Back")
             return weekCount - 1
         else: 
             return weekCount
@@ -650,6 +678,10 @@ class Coach:
             
             if now.weekday() == 0 and now.hour == startHour and now.minute == startMinute and not weekTracker:
                 print(f"New Week")
+                pullWeekCount += 1
+                pushWeekCount += 1
+                legsWeekCount += 1
+                
                 if pullWeekCount == 1:
                     pullWeekCount = self.moveUpChecker(pullWeekCount, pullRepRange, self.todaysRoutine)
                 elif pullWeekCount == 3:
@@ -678,10 +710,7 @@ class Coach:
                     legsWeekCount = 0
                     legsRepRange = self.legsRepRangeCycle.pop(0)
                     self.legsRepRangeCycle.append(legsRepRange)
-                
-                pullWeekCount += 1
-                pushWeekCount += 1
-                legsWeekCount += 1
+                    
                 weekTracker = True
                 time.sleep(60)
                 
@@ -779,6 +808,11 @@ if __name__ == "__main__":
     coach = Coach(textState)
     listener = TextListener(coach, textState)
 
+    # coach.moveUpChecker(1, "6-8", ["Push", ["Bench_Press", "Chest_Fly", "Incline_Dumbbell_Press", "Tricep_Pull_Down", "Plate_Loaded_Shoulder_Press"]])
+    
+    
+    # coach.decideToadysWorkOut("6-8", ["Push", ["Bench_Press", "Chest_Fly", "Incline_Dumbbell_Press", "Tricep_Pull_Down", "Plate_Loaded_Shoulder_Press"]])
+    
     coach_thread = threading.Thread(target=coach.openLoop, daemon=True)
     listener_thread = threading.Thread(target=listener.start_listening, daemon=True)
 
