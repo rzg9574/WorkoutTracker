@@ -7,6 +7,8 @@ from twilio.rest import Client
 import datetime
 import time
 import threading
+from fuzzywuzzy import fuzz
+from fuzzywuzzy import process
 
 
 class Session:
@@ -359,7 +361,8 @@ class Coach:
         load_dotenv()
         sets = []
         workouts = []
-        workoutPlan = self.cycle[-1] 
+        workoutPlan = self.cycle[-1]
+        print(workoutPlan[1])
         session = None
         nextOne = True
         name = None
@@ -374,6 +377,7 @@ class Coach:
                 if "rating" in t.lower():
                     rating = t.lower().replace("rating:", "")
                     break
+                
                 if "skip" in t.lower():
                     if name:
                         if "*" in name[0]:
@@ -381,10 +385,14 @@ class Coach:
                             workoutPlan = self.cycle[-1]
                             
                         if sets:
-                            workouts.append(Workout(workoutPlan[-1][i], sets))
+                            name = process.extractOne(name , workoutPlan[1], scorer=fuzz.ratio)
+                            if name and name[1] > 60:
+                                matched_name = name[0]
+                                workouts.append(Workout(matched_name, sets))
+                            else:
+                                workouts.append(Workout("N/A", sets))
                             sets = []
-                            i += 1
-                    i += 1
+                            
                     continue
         
                 if ":" in t:
@@ -394,9 +402,14 @@ class Coach:
                             workoutPlan = self.cycle[-1]
                             
                         if sets:
-                            workouts.append(Workout(workoutPlan[-1][i], sets))
+                            name = process.extractOne(name , workoutPlan[1], scorer=fuzz.ratio)
+                            if name and name[1] > 60:
+                                matched_name = name[0]
+                                workouts.append(Workout(matched_name, sets))
+                            else:
+                                workouts.append(Workout("N/A", sets))
                             sets = []
-                            i += 1
+            
                     index = t.find(":")
                     if index != -1:
                         name = t[:index]
@@ -421,12 +434,18 @@ class Coach:
                 self.changeExerciseInRoutine(workoutPlan[0], workoutPlan[-1][i], name.replace("*", ""))
                 workoutPlan = self.cycle[-1]
             if sets:
-                workouts.append(Workout(workoutPlan[-1][i], sets))
+                name = process.extractOne(name , workoutPlan[1], scorer=fuzz.ratio)
+                if name and name[1] > 60:
+                    matched_name = name[0]
+                    workouts.append(Workout(matched_name, sets))
+                else:
+                    workouts.append(Workout("N/A", sets))
                 sets = []
             
         session = Session(workouts, datetime.datetime.today(), int(rating), workoutPlan[0])
         
-        self.db.postWorkOut(session)
+        #self.db.postWorkOut(session)
+        print(session)
         return session
     
     
@@ -812,6 +831,7 @@ if __name__ == "__main__":
     
     
     # coach.decideToadysWorkOut("6-8", ["Push", ["Bench_Press", "Chest_Fly", "Incline_Dumbbell_Press", "Tricep_Pull_Down", "Plate_Loaded_Shoulder_Press"]])
+    
     
     coach_thread = threading.Thread(target=coach.openLoop, daemon=True)
     listener_thread = threading.Thread(target=listener.start_listening, daemon=True)
