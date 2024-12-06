@@ -223,7 +223,7 @@ class Coach:
         self.weekCount = {}
         for cycle in self.cycle:
             self.weekCount[cycle[0]] = 0
-            self.repRangeCycle[cycle[0]] = self.routine["Priodization_Cycle"]
+            self.repRangeCycle[cycle[0]] = self.routine["Periodization_Cycle"]
         
         self.repRangeKey = {"Full_Compound": "4-8", "Semi_Compound": "6-8", "Non_Compound":"10-15", "Body_Weight": "7-12"}
         self.todaysRoutine = self.cycle[0]
@@ -662,12 +662,6 @@ class Coach:
         else: 
             return weekCount
                 
-    
-    def cycleAllRepRanges(self):
-        repRanges = {}
-        for day, range in self.repRangeCycle.items():
-            repRanges[day] = self.repRangeCycle[day].pop(0)
-            self.repRangeCycle[day].append(range)
         
     
     def newDay(self, pastDayWasARestDay=False):
@@ -676,7 +670,7 @@ class Coach:
             self.cycle.append(todaysRoutine)
             self.todaysRoutine = todaysRoutine
         
-        self.decideToadysWorkOut(self.repRangeCycle[self.todaysRoutine[0]], self.todaysRoutine)
+        self.decideToadysWorkOut(self.repRangeCycle[self.todaysRoutine[0]][0], self.todaysRoutine)
         
     
     def openLoop(self):
@@ -684,7 +678,6 @@ class Coach:
         startMinute = 30
         weekTracker = False
         dayTracker = False
-        self.cycleAllRepRanges()
         last_day_processed = None
         while True:
             now = datetime.datetime.now()
