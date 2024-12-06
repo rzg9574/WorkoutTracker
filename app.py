@@ -10,6 +10,7 @@ import threading
 from fuzzywuzzy import fuzz
 from fuzzywuzzy import process
 from enum import Enum
+import logging
 
 class MoveUp(Enum):
     UP = "U"
@@ -160,7 +161,7 @@ class DBController:
         if not result:
             self.exerciseCollection.insert_one({"Name":name, "Type": type, "Move_Up_Rate": moveUp, "Move_Up": MoveUp.STAY.value, "Weight":int(weight)})
         else:
-            print(f"{name} is already in the database updating it")
+            logging.warning(f"{name} is already in the database updating it")
             self.exerciseCollection.replace_one({"Name":name}, {"Name":name, "Type": type, "Move_Up_Rate": moveUp, "Move_Up": MoveUp.STAY.value, "Weight":int(weight)}, True)
         
     def loadInExercises(self, textFile):
@@ -174,7 +175,7 @@ class DBController:
                     if not result:
                         self.exerciseCollection.insert_one({"Name":splitLine[0], "Type": splitLine[1].replace("\n", ""), "Move_Up_Rate": int(splitLine[2]) if len(splitLine) > 2 else 10, "Move_Up": MoveUp.STAY.value, "Weight":int(splitLine[3])})
                     else:
-                        print(f"{splitLine[0]} is already in the database updating it")
+                        logging.warning(f"{splitLine[0]} is already in the database updating it")
                         self.exerciseCollection.replace_one({"Name":splitLine[0]}, {"Name":splitLine[0], "Type": splitLine[1].replace("\n", ""), "Move_Up_Rate": int(splitLine[2]) if len(splitLine) > 2 else 10, "Move_Up": MoveUp.STAY.value, "Weight":int(splitLine[3]) }, True)
                     
     def getAllPastSpecificExercise(self, exercise):
@@ -248,10 +249,10 @@ class Coach:
                 moveUp = split[1]
                 weight = split[2]
             else:
-                print("Not the right format you need to tell me the move up rate and the weight your currently doing")
+                logging.warning("Not the right format you need to tell me the move up rate and the weight your currently doing")
                 return
         else:
-            print("Not the right format for adding new exersie Use ()")
+            logging.warning("Not the right format for adding new exersie Use ()")
             return
         
         self.db.postNewWorkOut(new, type, moveUp, weight)  
@@ -362,14 +363,14 @@ class Coach:
                         message += f"{typeOfExersice['Weight'] - typeOfExersice['Move_Up_Rate']} ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
         
         self.sendText(message)
-        print(message)
+        print(f"sent you a text:{message}")
     
     def incomingText(self, text):
         load_dotenv()
         sets = []
         workouts = []
         workoutPlan = self.cycle[-1]
-        print(workoutPlan[1])
+        print(f"workout plan you were suppose follow {workoutPlan[1]}")
         session = None
         nextOne = True
         name = None
@@ -452,7 +453,7 @@ class Coach:
         session = Session(workouts, datetime.datetime.today(), int(rating), workoutPlan[0])
         
         self.db.postWorkOut(session)
-        print(session)
+        print(f"Processed session: {session}")
         return session
     
     
@@ -520,16 +521,13 @@ class Coach:
                     if autoFail:
                         continue
                 else:
-                    print("Failed")
                     passFail.append({exercise: "F"})
                     continue
                 
                 
                 if deadliftPoints < 2:
-                    print(f"Failed")
                     passFail.append({exercise: "F"})
                 else:
-                    print("Pass")
                     passFail.append({exercise: "P"})
                 continue 
             else:          
@@ -563,7 +561,6 @@ class Coach:
                     if autoFail:
                         continue
                 else:
-                    print("Failed")
                     passFail.append({exercise: "F"})
                     continue 
                             
@@ -623,27 +620,21 @@ class Coach:
             
                 if type["Type"] == "Full_Compound":    
                     if compoundPoints >= 4:
-                        print(f"Pass")
                         passFail.append({exercise: ["P", compoundPoints]})
                     elif compoundPoints < 3:
-                        print("Fail +")
                         passFail.append({exercise: ["F+", compoundPoints]})
                     else:
-                        print("Fail")
                         passFail.append({exercise: ["F", compoundPoints]})
                     
                 else:
                     if nonCompoundPoints >= 4:
-                        print(f"Pass")
                         passFail.append({exercise: ["P", nonCompoundPoints]})
                     elif nonCompoundPoints <= 3:
-                        print("Fail +")
                         passFail.append({exercise: ["F+", nonCompoundPoints] })
                     else:
-                        print("Fail")
                         passFail.append({exercise: ["F", nonCompoundPoints]})
                         
-        print(passFail)
+        print(f"Heres your report card:{passFail}")
         for exercise in passFail:
             exerciseName, grade = next(iter(exercise.items()))
             type = self.db.getTypeOfExercise(exerciseName)
@@ -657,7 +648,6 @@ class Coach:
         
         
         if holdBack:
-            print("Hold Back")
             return weekCount - 1
         else: 
             return weekCount
@@ -679,23 +669,29 @@ class Coach:
         weekTracker = False
         dayTracker = False
         last_day_processed = None
+        print("Starting openLoop method.")
         while True:
             now = datetime.datetime.now()
             
             if now.weekday() == 0 and now.hour == startHour and now.minute == startMinute and not weekTracker:
-                print(f"New Week")
+                print("New week detected. Running weekly logic.")
                 for week in self.weekCount:
                     self.weekCount[week] += 1 
+                    logging.debug(f"About to run moveUpChecker for {week} with weekCount={self.weekCount[week]}")
                     if  self.weekCount[week] == 1:
                         self.weekCount[week] = self.moveUpChecker(self.weekCount[week], self.repRangeCycle[week], self.todaysRoutine)
+                        logging.debug(f"moveUpChecker adjusted {week} from {self.weekCount[week]} to {self.weekCount[week]}")
                     elif  self.weekCount[week] == 3:
                         self.weekCount[week] = self.moveUpChecker(self.weekCount[week], self.repRangeCycle[week], self.todaysRoutine)
+                        logging.debug(f"moveUpChecker adjusted {week} from {self.weekCount[week]} to {self.weekCount[week]}")
                     elif self.weekCount[week] == 4:
                         self.weekCount[week] = 0
                         range = self.repRangeCycle[week].pop(0)
                         self.repRangeCycle[week].append(range)
+                        logging.debug(f"Rotated rep range cycle for {week}")
                         
                 weekTracker = True
+                print("Weekly logic complete. Sleeping for 60 seconds.")
                 time.sleep(60)
                 
             # Reset weekly flag on any day other than the first day of the week
@@ -703,19 +699,22 @@ class Coach:
                 weekTracker = False
             
             if now.hour == startHour and now.minute == startMinute and (last_day_processed is None or last_day_processed != now.date()):
-                print("New Day")
+                print("New day detected. Running daily logic.")
                 if self.textState.getState():
-                    print("Deciding new Workout")
+                    print("Received text state as True, scheduling new workout.")
                     self.newDay(pastDayWasARestDay=False)
                     
                 else:
+                    print("No text detected, assuming rest day.")
                     print("I See We Resting Now Loser")
                     self.newDay(pastDayWasARestDay=True)
                     
                 self.textState.resetTextState()
-                last_day_processed = now.date() 
+                last_day_processed = now.date()
+                print("Daily logic complete. Sleeping for 60 seconds.") 
                 time.sleep(60)
-                
+            
+
             time.sleep(10)
     
             
