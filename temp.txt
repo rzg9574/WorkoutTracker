@@ -1,84 +1,101 @@
 {
-  "Date": "11/26/24",
+  "_id": {
+    "$oid": "674c9c4dc01eb16154f98d40"
+  },
+  "Date": {
+    "$date": "2024-12-05T05:00:00.000Z"
+  },
   "List_of_Workouts": [
     {
-      "Name": "Dead_Lifts",
+      "Name": "Bench_Press",
       "Sets": [
         {
-          "Weight": 345,
+          "Weight": 195,
+          "Reps": 4
+        },
+        {
+          "Weight": 195,
+          "Reps": 4
+        },
+        {
+          "Weight": 175,
           "Reps": 6
+        },
+        {
+          "Weight": 135,
+          "Reps": 12
         }
       ]
     },
     {
-      "Name": "Barbell_Rows",
+      "Name": "Chest_Fly",
       "Sets": [
         {
-          "Weight": 155,
-          "Reps": 7
-        },
-        {
-          "Weight": 150,
-          "Reps": 6
+          "Weight": 165,
+          "Reps": 8
         },
         {
           "Weight": 145,
-          "Reps": 8
-        }
-      ]
-    },
-    {
-      "Name": "Pull_Ups",
-      "Sets": [
-        {
-          "Weight": 0,
-          "Reps": 7
-        },
-        {
-          "Weight": 0,
-          "Reps": 5
-        },
-        {
-          "Weight": 0,
-          "Reps": 4
-        }
-      ]
-    },
-    {
-      "Name": "Hammer_Curls",
-      "Sets": [
-        {
-          "Weight": 35,
           "Reps": 10
         },
         {
-          "Weight": 30,
-          "Reps": 10
-        },
-        {
-          "Weight": 25,
-          "Reps": 12
+          "Weight": 125,
+          "Reps": 9
         }
       ]
     },
     {
-      "Name": "Machine_Curls",
+      "Name": "Incline_Dumbbell_Press",
       "Sets": [
         {
           "Weight": 65,
-          "Reps": 8
+          "Reps": 6
+        },
+        {
+          "Weight": 60,
+          "Reps": 6
         },
         {
           "Weight": 55,
+          "Reps": 7
+        }
+      ]
+    },
+    {
+      "Name": "Tricep_Pull_Down",
+      "Sets": [
+        {
+          "Weight": 100,
           "Reps": 8
         },
         {
+          "Weight": 90,
+          "Reps": 10
+        },
+        {
+          "Weight": 70,
+          "Reps": 10
+        }
+      ]
+    },
+    {
+      "Name": "Plate_Loaded_Shoulder_Press",
+      "Sets": [
+        {
+          "Weight": 55,
+          "Reps": 7
+        },
+        {
+          "Weight": 55,
+          "Reps": 6
+        },
+        {
           "Weight": 45,
-          "Reps": 12
+          "Reps": 6
         }
       ]
     }
   ],
   "Rating": 7,
-  "Day": "Pull"
+  "Day": "Push"
 }

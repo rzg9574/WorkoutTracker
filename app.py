@@ -203,9 +203,7 @@ class DBController:
     
 class Coach:
     cycle = []
-    pullRepRangeCycle = []
-    pushRepRangeCycle = []
-    legsRepRangeCycle = []
+    repRangeCycle = {} 
     repRangeKey = {}
     startingPercentage = 0.82
     db = DBController()
@@ -215,15 +213,20 @@ class Coach:
     todaysRoutine = []
     
     
-    def __init__(self, textState):
+    def __init__(self, textState, routineType):
         self.loadInRoutine()
-        self.cycle = [["Legs",self.routine["Legs"]], ["Pull",self.routine["Pull"]], ["Push",self.routine["Push"]]]
-        self.pullRepRangeCycle = ["6-8", "4-6", "2-4"]
-        self.pushRepRangeCycle = ["6-8", "4-6", "2-4"]
-        self.legsRepRangeCycle = ["6-8", "4-6", "2-4"]
+        for i in range(1, self.routine[routineType]["Unique_Days"]["Number_of_Days"] + 1):
+            day = self.routine[routineType]["Unique_Days"][f"day{i}"]
+            self.cycle.append([day, self.routine[routineType]["Routine"][day]])
+        
+        self.numberOfSeparateWeeksToTrack = len(self.cycle)
+        self.weekCount = {}
+        for cycle in self.cycle:
+            self.weekCount[cycle[0]] = 0
+            self.repRangeCycle[cycle[0]] = self.routine["Priodization_Cycle"]
+        
         self.repRangeKey = {"Full_Compound": "4-8", "Semi_Compound": "6-8", "Non_Compound":"10-15", "Body_Weight": "7-12"}
         self.todaysRoutine = self.cycle[0]
-        self.day = self.cycle[0][0]
         self.textState = textState
                 
     def loadInRoutine(self):
@@ -289,7 +292,6 @@ class Coach:
         
     
     def decideToadysWorkOut(self, repRange, todaysRoutine):
-        self.day = todaysRoutine[0]
         message = "Do This Today:\n"
         for workout in todaysRoutine[1]:
             message += f"{workout}:\n"
@@ -662,79 +664,44 @@ class Coach:
                 
     
     def cycleAllRepRanges(self):
-        pullRepRange = self.pullRepRangeCycle.pop(0)
-        self.pullRepRangeCycle.append(pullRepRange)
+        repRanges = {}
+        for day, range in self.repRangeCycle.items():
+            repRanges[day] = self.repRangeCycle[day].pop(0)
+            self.repRangeCycle[day].append(range)
         
-        pushRepRange = self.pushRepRangeCycle.pop(0)
-        self.pushRepRangeCycle.append(pushRepRange)
-        
-        legsRepRange = self.legsRepRangeCycle.pop(0)
-        self.legsRepRangeCycle.append(legsRepRange)
-
-        return pullRepRange, pushRepRange, legsRepRange
     
-    def newDay(self, pushRepRange, pullRepRange, legsRepRange, todaysRoutine, pastDayWasARestDay=False):
+    def newDay(self, pastDayWasARestDay=False):
         if not pastDayWasARestDay:
             todaysRoutine = self.cycle.pop(0)
             self.cycle.append(todaysRoutine)
+            self.todaysRoutine = todaysRoutine
         
-        if todaysRoutine[0] == "Push":
-            self.decideToadysWorkOut(pushRepRange, todaysRoutine)
-        elif todaysRoutine[0] == "Pull":
-            self.decideToadysWorkOut(pullRepRange, todaysRoutine)
-        else:
-            self.decideToadysWorkOut(legsRepRange, todaysRoutine)
+        self.decideToadysWorkOut(self.repRangeCycle[self.todaysRoutine[0]], self.todaysRoutine)
         
-        return todaysRoutine
     
     def openLoop(self):
         startHour = 5
         startMinute = 30
         weekTracker = False
-        pullWeekCount = 1
-        pushWeekCount = 1
-        legsWeekCount = 1
         dayTracker = False
-        pullRepRange, pushRepRange, legsRepRange = self.cycleAllRepRanges()
+        self.cycleAllRepRanges()
         last_day_processed = None
         while True:
             now = datetime.datetime.now()
             
             if now.weekday() == 0 and now.hour == startHour and now.minute == startMinute and not weekTracker:
                 print(f"New Week")
-                pullWeekCount += 1
-                pushWeekCount += 1
-                legsWeekCount += 1
-                
-                if pullWeekCount == 1:
-                    pullWeekCount = self.moveUpChecker(pullWeekCount, pullRepRange, self.todaysRoutine)
-                elif pullWeekCount == 3:
-                    pullWeekCount = self.moveUpChecker(pullWeekCount, pullRepRange, self.todaysRoutine)
-                elif pullWeekCount == 4:
-                    pullWeekCount = 0
-                    pullRepRange = self.pullRepRangeCycle.pop(0)
-                    self.pullRepRangeCycle.append(pullRepRange)
-                    
-                
-                if pushWeekCount == 1:
-                    pushWeekCount = self.moveUpChecker(pushWeekCount, pushRepRange, self.todaysRoutine)
-                elif pushWeekCount == 3:
-                    pushWeekCount = self.moveUpChecker(pushWeekCount, pushRepRange, self.todaysRoutine)
-                elif pushWeekCount == 4:
-                    pushWeekCount = 0
-                    pushRepRange = self.pushRepRangeCycle.pop(0)
-                    self.pushRepRangeCycle.append(pushRepRange)
-                
-                
-                if legsWeekCount == 1:
-                    legsWeekCount = self.moveUpChecker(legsWeekCount, legsRepRange, self.todaysRoutine)
-                elif legsWeekCount == 3:
-                    legsWeekCount = self.moveUpChecker(legsWeekCount, legsRepRange, self.todaysRoutine)
-                elif legsWeekCount == 4:
-                    legsWeekCount = 0
-                    legsRepRange = self.legsRepRangeCycle.pop(0)
-                    self.legsRepRangeCycle.append(legsRepRange)
-                    
+                for week in self.weekCount:
+                    self.weekCount[week] += 1 
+                    if  self.weekCount[week] == 1:
+                        self.weekCount[week] = self.moveUpChecker(self.weekCount[week], self.repRangeCycle[week], self.todaysRoutine)
+                    elif  self.weekCount[week] == 3:
+                        self.weekCount[week] = self.moveUpChecker(self.weekCount[week], self.repRangeCycle[week], self.todaysRoutine)
+                    elif self.weekCount[week] == 4:
+                        self.weekCount[week] = 0
+                        range = self.repRangeCycle[week].pop(0)
+                        self.repRangeCycle[week].append(range)
+                        
                 weekTracker = True
                 time.sleep(60)
                 
@@ -746,20 +713,15 @@ class Coach:
                 print("New Day")
                 if self.textState.getState():
                     print("Deciding new Workout")
-                    self.todaysRoutine = self.newDay(pushRepRange, pullRepRange, legsRepRange, self.todaysRoutine, pastDayWasARestDay=False)
+                    self.newDay(pastDayWasARestDay=False)
                     
                 else:
                     print("I See We Resting Now Loser")
-                    print("Got No Text Message Assuming it was a Rest Day")
-                    self.todaysRoutine = self.newDay(pushRepRange, pullRepRange, legsRepRange, self.todaysRoutine, pastDayWasARestDay=True)
+                    self.newDay(pastDayWasARestDay=True)
                     
-                
                 self.textState.resetTextState()
                 last_day_processed = now.date() 
-                
                 time.sleep(60)
-                 
-            
                 
             time.sleep(10)
     
@@ -829,15 +791,9 @@ class TextListener:
 
 if __name__ == "__main__":
     textState = TextState() 
-    coach = Coach(textState)
-    listener = TextListener(coach, textState)
-
-    # coach.moveUpChecker(1, "6-8", ["Push", ["Bench_Press", "Chest_Fly", "Incline_Dumbbell_Press", "Tricep_Pull_Down", "Plate_Loaded_Shoulder_Press"]])
-    
-    
-    # coach.decideToadysWorkOut("6-8", ["Push", ["Bench_Press", "Chest_Fly", "Incline_Dumbbell_Press", "Tricep_Pull_Down", "Plate_Loaded_Shoulder_Press"]])
-    
-    
+    coach = Coach(textState, "PPL")
+    listener = TextListener(coach, textState)    
+     
     coach_thread = threading.Thread(target=coach.openLoop, daemon=True)
     listener_thread = threading.Thread(target=listener.start_listening, daemon=True)
 
