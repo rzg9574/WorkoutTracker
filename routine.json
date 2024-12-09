@@ -9,9 +9,9 @@
     "PPL":{
         "Unique_Days":{
             "Number_of_Days": 3,
-            "day1" : "Pull",
-            "day2" : "Push",
-            "day3" : "Legs"
+            "day1" : "Legs",
+            "day2" : "Pull",
+            "day3" : "Push"
         }, 
         "Routine": {
             "Push": ["Bench_Press", "Chest_Fly", "Incline_Dumbbell_Press", "Tricep_Pull_Down", "Plate_Loaded_Shoulder_Press"], 

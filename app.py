@@ -17,6 +17,11 @@ class MoveUp(Enum):
     DOWN = "D"
     STAY = "S"
 
+class Compound(Enum):
+    NON_COMPOUND = "N"
+    COMPOUND = "C"
+    SEMI_COMPOUND = "S"
+
 class Session:
     workouts = []
     date = None 
@@ -116,12 +121,15 @@ class DBController:
     workOutsCollection = None
     exerciseCollection = None 
     
-    def __init__(self):
+    def __init__(self, LADY = False):
         load_dotenv()
         dbLogin = os.environ.get('dbLogin')
         client = MongoClient(dbLogin)
         self.db = client["WorkoutTracker"]
-        self.workOutsCollection = self.db["Workouts"]
+        if LADY:
+            self.workOutsCollection = self.db["Lady_Workouts"]
+        else:
+            self.workOutsCollection = self.db["Workouts"]
         self.exerciseCollection = self.db["Exercises"]
         print("Database Initialized")
         
@@ -207,14 +215,16 @@ class Coach:
     repRangeCycle = {} 
     repRangeKey = {}
     startingPercentage = 0.82
-    db = DBController()
+    db = None
     routine = None
     routineFile = "routine.json"
     day = None
     todaysRoutine = []
+    LADY = False
     
-    
-    def __init__(self, textState, routineType):
+    def __init__(self, textState, routineType, LADY=False):
+        self.LADY = LADY
+        self.db = DBController(LADY=self.LADY)
         self.loadInRoutine()
         for i in range(1, self.routine[routineType]["Unique_Days"]["Number_of_Days"] + 1):
             day = self.routine[routineType]["Unique_Days"][f"day{i}"]
@@ -244,7 +254,13 @@ class Coach:
             split = new.split("(")
             new = split[0]
             split = split[1].replace(")", "").split(",")
-            type = split[0]
+            if split[0] == Compound.COMPOUND.value:
+                type = "Full_Compound"
+            elif split[0] == Compound.SEMI_COMPOUND.value:
+                type = "Semi_Compound"
+            elif split[0] == Compound.NON_COMPOUND.value:
+                type = "Non_Compound"
+            
             if len(split) > 2:
                 moveUp = split[1]
                 weight = split[2]
@@ -260,7 +276,7 @@ class Coach:
         with open(self.routineFile, 'r') as file:
             routine = json.load(file)
         
-        for i in range(len(routine[day])):
+        for i in range(len(routine["PPL"]["Routine"][day])):
             if routine[day][i] == old:
                 routine[day][i] = new
         
@@ -284,11 +300,18 @@ class Coach:
         token = os.environ.get("token")
         
         client = Client(sid, token)
-        message = client.messages.create(
-            to = os.environ.get('myPhoneNumber'),
-            from_ = os.environ.get('twilloPhoneNumber'),
-            body= msg
-        )
+        if self.LADY:
+            message = client.messages.create(
+                to = os.environ.get('ladyPhoneNumber'),
+                from_ = os.environ.get('twilloPhoneNumber'),
+                body= msg
+            )
+        else:
+            message = client.messages.create(
+                to = os.environ.get('myPhoneNumber'),
+                from_ = os.environ.get('twilloPhoneNumber'),
+                body= msg
+            )
         return message.sid
         
     
@@ -303,11 +326,9 @@ class Coach:
                 if typeOfExersice["Move_Up"] == MoveUp.UP.value:
                     message += f"Top set of {typeOfExersice['Weight'] + typeOfExersice['Move_Up_Rate']} ==> {repRange}\n"
                     self.db.setExerciseWeight(typeOfExersice["Name"], typeOfExersice['Weight'] + typeOfExersice['Move_Up_Rate'])
-                    self.db.setExerciseMoveUpNeural(workout)
                 elif typeOfExersice["Move_Up"] == MoveUp.DOWN.value:
                     message += f"Top set of {typeOfExersice['Weight'] - typeOfExersice['Move_Up_Rate']} ==> {repRange}\n"
                     self.db.setExerciseWeight(typeOfExersice["Name"], typeOfExersice['Weight'] - typeOfExersice['Move_Up_Rate'])
-                    self.db.setExerciseMoveUpNeural(workout)
                 else:
                     message += f"Top set of {typeOfExersice['Weight']} ==> {repRange}\n"
                     
@@ -317,13 +338,11 @@ class Coach:
                     message += f"{typeOfExersice['Weight']} ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
                     message += f"{typeOfExersice['Weight'] - (2*typeOfExersice['Move_Up_Rate'])} ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
                     self.db.setExerciseWeight(typeOfExersice["Name"], typeOfExersice['Weight'] + typeOfExersice['Move_Up_Rate'])
-                    self.db.setExerciseMoveUpNeural(workout)
                 elif typeOfExersice["Move_Up"] == MoveUp.DOWN.value:
                     message += f"{typeOfExersice['Weight']-typeOfExersice['Move_Up_Rate']} ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
                     message += f"{typeOfExersice['Weight']-(2*typeOfExersice['Move_Up_Rate'])} ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
                     message += f"{typeOfExersice['Weight']-(2*typeOfExersice['Move_Up_Rate'])} ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
                     self.db.setExerciseWeight(typeOfExersice["Name"], typeOfExersice['Weight'] - typeOfExersice['Move_Up_Rate'])
-                    self.db.setExerciseMoveUpNeural(workout)
                 else:
                     message += f"{typeOfExersice['Weight']} ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
                     message += f"{typeOfExersice['Weight'] - typeOfExersice['Move_Up_Rate']} ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
@@ -340,7 +359,6 @@ class Coach:
                         message += f"{typeOfExersice['Weight'] - typeOfExersice['Move_Up_Rate']} ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
                         message += f"{typeOfExersice['Weight'] - (2*typeOfExersice['Move_Up_Rate'])} ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
                     self.db.setExerciseWeight(typeOfExersice["Name"], typeOfExersice['Weight'] + typeOfExersice['Move_Up_Rate'])
-                    self.db.setExerciseMoveUpNeural(workout)
                 elif typeOfExersice["Move_Up"] == MoveUp.DOWN.value:
                     if typeOfExersice["Name"] == "Pull_Ups":
                         message += f"0 ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
@@ -351,7 +369,6 @@ class Coach:
                         message += f"{typeOfExersice['Weight'] - (2*typeOfExersice['Move_Up_Rate'])} ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
                         message += f"{typeOfExersice['Weight'] - (2*typeOfExersice['Move_Up_Rate'])} ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
                     self.db.setExerciseWeight(typeOfExersice["Name"], typeOfExersice['Weight'] + typeOfExersice['Move_Up_Rate'])
-                    self.db.setExerciseMoveUpNeural(workout)
                 else:
                     if typeOfExersice["Name"] == "Pull_Ups":
                         message += f"0 ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
@@ -377,7 +394,10 @@ class Coach:
         rating = -1
         weight = None
         reps = None
-        text = text.replace(f"Message from {os.environ.get('myPhoneNumber')}:", "")
+        if self.LADY:
+            text = text.replace(f"Message from {os.environ.get('ladyPhoneNumber')}:", "")
+        else:
+            text = text.replace(f"Message from {os.environ.get('myPhoneNumber')}:", "")
         splitText = text.split("\n")
         i = 0
         for t in splitText:
@@ -403,7 +423,7 @@ class Coach:
                             
                     continue
         
-                if ":" in t:
+                if ":" in t or ";":
                     if name:
                         if "*" in name[0]:
                             self.changeExerciseInRoutine(workoutPlan[0], workoutPlan[-1][i], name.replace("*", ""))
@@ -418,7 +438,10 @@ class Coach:
                                 workouts.append(Workout("N/A", sets))
                             sets = []
             
-                    index = t.find(":")
+                    if ":" in t:
+                        index = t.find(":")
+                    else:
+                        index = t.find(";")
                     if index != -1:
                         name = t[:index]
                 else:
@@ -461,8 +484,8 @@ class Coach:
         self.db.loadInExercises(file)
     
     def moveUpChecker(self, weekCount, repRange, routine):
-        minRep = int(repRange.split("-")[0])
-        maxRep = int(repRange.split("-")[1])
+        minRep = int(repRange[0].split("-")[0])
+        maxRep = int(repRange[0].split("-")[1])
         holdBack = False
         passFail = []
         
@@ -473,11 +496,9 @@ class Coach:
             firstSet = []
             secondSet = []
             lastSet = []
-            if weekCount <= 2:
-                results = self.db.getLastTwoPastSpecificExercise(exercise)
-            else:
-                results = self.db.getLastFourPastSpecificExercise(exercise)
-                
+                        
+            results = self.db.getLastTwoPastSpecificExercise(exercise)
+    
             for session in results:
                 autoFail = False
                 if session['Rating'] < 5:
@@ -534,10 +555,13 @@ class Coach:
                 if firstSet:
                     autoFail = False
                     for set in firstSet: 
-                        if set["Reps"] < minRep:
+                        if set["Reps"] <= minRep - 2:
                             passFail.append({exercise: ["F", set]})
                             autoFail = True
                             break
+                        if set["Reps"] == minRep - 1:
+                            compoundPoints -= 1
+                            
                         if int(set['Weight']) >= int(type['Weight']):
                             compoundPoints += 0.5
                             nonCompoundPoints += 0.5
@@ -662,6 +686,41 @@ class Coach:
         
         self.decideToadysWorkOut(self.repRangeCycle[self.todaysRoutine[0]][0], self.todaysRoutine)
         
+    def moveBackChecker(self, weekCount, repRange, routine):
+        minRep = int(repRange[routine[0]].split("-")[0])
+        maxRep = int(repRange[routine[0]].split("-")[1])
+        holdBack = False
+        
+        for exercise in routine[1]:
+            type = self.db.getTypeOfExercise(exercise)
+            firstSet = []
+                        
+            results = self.db.getLastTwoPastSpecificExercise(exercise)
+            
+            for session in results:
+                try:
+                    firstSet.append(session["List_of_Workouts"][0]["Sets"][0])        
+                except:
+                    pass
+            
+            if firstSet:
+                if type["Move_Up"] == MoveUp.UP.value:
+                    if firstSet[0]["Reps"] < minRep:
+                        if type["Type"] == "Full_Compound":
+                            holdBack = True
+                        self.db.setExerciseMoveUpFalse(exercise)
+                elif type["Move_Up"] == MoveUp.DOWN.value:
+                    if firstSet[0]["Reps"] > maxRep:
+                        self.db.setExerciseMoveUpTrue(exercise)
+            else:
+                self.db.setExerciseMoveUpFalse(exercise)
+        
+        if holdBack:
+            return 0
+        else: 
+            return weekCount
+            
+            
     
     def openLoop(self):
         startHour = 5
@@ -669,7 +728,7 @@ class Coach:
         weekTracker = False
         dayTracker = False
         last_day_processed = None
-        print("Starting openLoop method.")
+        print(f"Starting openLoop method. today is {self.cycle[-1]} Tmr is {self.todaysRoutine}")
         while True:
             now = datetime.datetime.now()
             
@@ -681,18 +740,17 @@ class Coach:
                     if  self.weekCount[week] == 1:
                         self.weekCount[week] = self.moveUpChecker(self.weekCount[week], self.repRangeCycle[week], self.todaysRoutine)
                         logging.debug(f"moveUpChecker adjusted {week} from {self.weekCount[week]} to {self.weekCount[week]}")
-                    elif  self.weekCount[week] == 3:
-                        self.weekCount[week] = self.moveUpChecker(self.weekCount[week], self.repRangeCycle[week], self.todaysRoutine)
-                        logging.debug(f"moveUpChecker adjusted {week} from {self.weekCount[week]} to {self.weekCount[week]}")
+                    elif self.weekCount[week] == 2:
+                        self.weekCount[week] = self.moveBackChecker(self.weekCount[week], self.repRangeCycle[week], self.todaysRoutine) 
                     elif self.weekCount[week] == 4:
+                        self.weekCount[week] = self.moveUpChecker(self.weekCount[week], self.repRangeCycle[week], self.todaysRoutine)
                         self.weekCount[week] = 0
                         range = self.repRangeCycle[week].pop(0)
                         self.repRangeCycle[week].append(range)
                         logging.debug(f"Rotated rep range cycle for {week}")
                         
                 weekTracker = True
-                print("Weekly logic complete. Sleeping for 60 seconds.")
-                time.sleep(60)
+                print("Weekly logic complete")
                 
             # Reset weekly flag on any day other than the first day of the week
             if now.weekday() != 0:
@@ -732,9 +790,11 @@ class TextState:
         return self._gotText
     
 class TextListener:
-    def __init__(self, coach, textState):
+    def __init__(self, coach, textState, ladyCoach, ladyTextState):
         self.coach = coach
         self.textState = textState
+        self.ladyCoach = ladyCoach
+        self.ladyTextState = ladyTextState
         #Twillo api sends there texts in UTC time have to convert to EST
         self.timeOffset = 5
         self.load_twilio_credentials()
@@ -751,6 +811,7 @@ class TextListener:
         self.token = os.environ.get("token")
         self.twilio_phone_number = os.environ.get("twilloPhoneNumber")
         self.my_phone_number = os.environ.get("myPhoneNumber")
+        self.lady_phone_number = os.environ.get("ladyPhoneNumber")
     
     def check_for_incoming_text(self):
         messages = self.client.messages.list(
@@ -764,6 +825,12 @@ class TextListener:
                 self.processed_messages.add(message.sid)
                 self.textState.gotText()
                 self.coach.incomingText(message.body)
+                print(f"Processed message: {message.body}")
+                
+            if message.sid not in self.processed_messages and message.from_ == self.lady_phone_number:
+                self.processed_messages.add(message.sid)
+                self.ladyTextState.gotText()
+                self.ladyCoach.incomingText(message.body)
                 print(f"Processed message: {message.body}")
               
         self.last_checked = datetime.datetime.now()
@@ -782,15 +849,22 @@ class TextListener:
 
 
 if __name__ == "__main__":
-    textState = TextState() 
-    coach = Coach(textState, "PPL")
-    listener = TextListener(coach, textState)    
+    myTextState = TextState() 
+    myCoach = Coach(myTextState, "PPL")
+    
+    ladyTextState = TextState()
+    ladyCoach = Coach(ladyTextState, "PPL")
+    
+    listener = TextListener(myCoach, myTextState, ladyCoach, ladyTextState)    
      
-    coach_thread = threading.Thread(target=coach.openLoop, daemon=True)
+    coach_thread = threading.Thread(target=myCoach.openLoop, daemon=True)
+    #lady_thread = threading.Thread(target=ladyCoach.openLoop, daemon=True)
     listener_thread = threading.Thread(target=listener.start_listening, daemon=True)
 
+    #lady_thread.start()
     coach_thread.start()
     listener_thread.start()
 
+    #lady_thread.join()
     coach_thread.join()
     listener_thread.join()  

@@ -3,7 +3,7 @@
     "$oid": "674c9c4dc01eb16154f98d40"
   },
   "Date": {
-    "$date": "2024-12-05T05:00:00.000Z"
+    "$date": "2024-12-8T05:00:00.000Z"
   },
   "List_of_Workouts": [
     {
@@ -14,16 +14,12 @@
           "Reps": 4
         },
         {
-          "Weight": 195,
-          "Reps": 4
+          "Weight": 185,
+          "Reps": 5
         },
         {
-          "Weight": 175,
+          "Weight": 155,
           "Reps": 6
-        },
-        {
-          "Weight": 135,
-          "Reps": 12
         }
       ]
     },
@@ -31,16 +27,16 @@
       "Name": "Chest_Fly",
       "Sets": [
         {
-          "Weight": 165,
+          "Weight": 145,
+          "Reps": 9
+        },
+        {
+          "Weight": 135,
           "Reps": 8
         },
         {
-          "Weight": 145,
-          "Reps": 10
-        },
-        {
           "Weight": 125,
-          "Reps": 9
+          "Reps": 8
         }
       ]
     },
@@ -48,8 +44,8 @@
       "Name": "Incline_Dumbbell_Press",
       "Sets": [
         {
-          "Weight": 65,
-          "Reps": 6
+          "Weight": 60,
+          "Reps": 7
         },
         {
           "Weight": 60,
@@ -57,7 +53,7 @@
         },
         {
           "Weight": 55,
-          "Reps": 7
+          "Reps": 6
         }
       ]
     },
@@ -65,16 +61,16 @@
       "Name": "Tricep_Pull_Down",
       "Sets": [
         {
-          "Weight": 100,
-          "Reps": 8
-        },
-        {
-          "Weight": 90,
-          "Reps": 10
+          "Weight": 80,
+          "Reps": 12
         },
         {
           "Weight": 70,
-          "Reps": 10
+          "Reps": 12
+        },
+        {
+          "Weight": 70,
+          "Reps": 12
         }
       ]
     },
@@ -87,7 +83,7 @@
         },
         {
           "Weight": 55,
-          "Reps": 6
+          "Reps": 5
         },
         {
           "Weight": 45,
@@ -96,6 +92,6 @@
       ]
     }
   ],
-  "Rating": 7,
+  "Rating": 4,
   "Day": "Push"
 }
