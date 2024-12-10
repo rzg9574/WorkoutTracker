@@ -221,9 +221,11 @@ class Coach:
     day = None
     todaysRoutine = []
     LADY = False
+    routineType = ""
     
     def __init__(self, textState, routineType, LADY=False):
         self.LADY = LADY
+        self.routineType = routineType
         self.db = DBController(LADY=self.LADY)
         self.loadInRoutine()
         for i in range(1, self.routine[routineType]["Unique_Days"]["Number_of_Days"] + 1):
@@ -276,7 +278,7 @@ class Coach:
         with open(self.routineFile, 'r') as file:
             routine = json.load(file)
         
-        for i in range(len(routine["PPL"]["Routine"][day])):
+        for i in range(len(routine[self.routineType]["Routine"][day])):
             if routine[day][i] == old:
                 routine[day][i] = new
         
@@ -314,6 +316,8 @@ class Coach:
             )
         return message.sid
         
+    
+    def getTodaysWorkOutMassage 
     
     def decideToadysWorkOut(self, repRange, todaysRoutine):
         message = "Do This Today:\n"
