@@ -317,8 +317,52 @@ class Coach:
         return message.sid
         
     
-    def getTodaysWorkOutMassage 
-    
+    def getTodaysWorkOutMassage(self, repRange, todaysRoutine): 
+        message = "Do This Today:\n"
+        for workout in todaysRoutine[1]:
+            message += f"{workout}:\n"
+            typeOfExersice = self.db.getTypeOfExercise(workout)
+            
+            if typeOfExersice["Type"] == "Full_Compound":
+                message += f"Top set of {typeOfExersice['Weight']} ==> {repRange}\n"
+                    
+            elif typeOfExersice["Type"] == "Non_Compound":
+                message += f"{typeOfExersice['Weight']} ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
+                message += f"{typeOfExersice['Weight'] - typeOfExersice['Move_Up_Rate']} ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
+                message += f"{typeOfExersice['Weight'] - (2*typeOfExersice['Move_Up_Rate'])} ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
+                    
+            elif typeOfExersice['Type'] == "Semi_Compound" or typeOfExersice['Type'] == "Body_Weight":
+                if typeOfExersice["Move_Up"] == MoveUp.UP.value:
+                    if typeOfExersice["Name"] == "Pull_Ups":
+                        message += f"0 ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
+                        message += f"0 ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
+                        message += f"0 ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
+                    else:
+                        message += f"{typeOfExersice['Weight']} ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
+                        message += f"{typeOfExersice['Weight'] - (2*typeOfExersice['Move_Up_Rate'])} ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
+                        message += f"{typeOfExersice['Weight'] - (3*typeOfExersice['Move_Up_Rate'])} ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
+                elif typeOfExersice["Move_Up"] == MoveUp.DOWN.value:
+                    if typeOfExersice["Name"] == "Pull_Ups":
+                        message += f"0 ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
+                        message += f"0 ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
+                        message += f"0 ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
+                    else:
+                        message += f"{typeOfExersice['Weight']} ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
+                        message += f"{typeOfExersice['Weight'] - typeOfExersice['Move_Up_Rate']} ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
+                        message += f"{typeOfExersice['Weight'] - typeOfExersice['Move_Up_Rate']} ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
+                else:
+                    if typeOfExersice["Name"] == "Pull_Ups":
+                        message += f"0 ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
+                        message += f"0 ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
+                        message += f"0 ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
+                    else:
+                        message += f"{typeOfExersice['Weight']} ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
+                        message += f"{typeOfExersice['Weight']} ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
+                        message += f"{typeOfExersice['Weight'] - typeOfExersice['Move_Up_Rate']} ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
+        
+        self.sendText(message)
+        print(f"sent you a text:{message}")
+        
     def decideToadysWorkOut(self, repRange, todaysRoutine):
         message = "Do This Today:\n"
         for workout in todaysRoutine[1]:
@@ -404,84 +448,89 @@ class Coach:
             text = text.replace(f"Message from {os.environ.get('myPhoneNumber')}:", "")
         splitText = text.split("\n")
         i = 0
-        for t in splitText:
-            if t:
-                if "rating" in t.lower():
-                    rating = t.lower().replace("rating:", "")
-                    break
-                
-                if "skip" in t.lower():
-                    if name:
-                        if "*" in name[0]:
-                            self.changeExerciseInRoutine(workoutPlan[0], workoutPlan[-1][i], name.replace("*", ""))
-                            workoutPlan = self.cycle[-1]
-                            
-                        if sets:
-                            name = process.extractOne(name , workoutPlan[1], scorer=fuzz.ratio)
-                            if name and name[1] > 60:
-                                matched_name = name[0]
-                                workouts.append(Workout(matched_name, sets))
-                            else:
-                                workouts.append(Workout("N/A", sets))
-                            sets = []
-                            
-                    continue
         
-                if ":" in t or ";":
-                    if name:
-                        if "*" in name[0]:
-                            self.changeExerciseInRoutine(workoutPlan[0], workoutPlan[-1][i], name.replace("*", ""))
-                            workoutPlan = self.cycle[-1]
-                            
-                        if sets:
-                            name = process.extractOne(name , workoutPlan[1], scorer=fuzz.ratio)
-                            if name and name[1] > 60:
-                                matched_name = name[0]
-                                workouts.append(Workout(matched_name, sets))
-                            else:
-                                workouts.append(Workout("N/A", sets))
-                            sets = []
+        try:
+            for t in splitText:
+                if t:
+                    if "rating" in t.lower():
+                        rating = t.lower().replace("rating:", "")
+                        break
+                    
+                    if "skip" in t.lower():
+                        if name:
+                            if "*" in name[0]:
+                                self.changeExerciseInRoutine(workoutPlan[0], workoutPlan[-1][i], name.replace("*", ""))
+                                workoutPlan = self.cycle[-1]
+                                
+                            if sets:
+                                name = process.extractOne(name , workoutPlan[1], scorer=fuzz.ratio)
+                                if name and name[1] > 60:
+                                    matched_name = name[0]
+                                    workouts.append(Workout(matched_name, sets))
+                                else:
+                                    workouts.append(Workout("N/A", sets))
+                                sets = []
+                                
+                        continue
             
-                    if ":" in t:
-                        index = t.find(":")
-                    else:
-                        index = t.find(";")
-                    if index != -1:
-                        name = t[:index]
-                else:
-                    if "x" in t:
-                        tempSplit = t.split("x")
-                    elif "-" in t:
-                        tempSplit = t.split("-")
-                    elif "/" in t:
-                        tempSplit = t.split("/")
-                    else:
-                        tempSplit = t.split(" ")
-                        
-                    if tempSplit and len(tempSplit) > 1:
-                        weight = tempSplit[0]
-                        reps = tempSplit[1]
-                        sets.append(Set(weight, reps))
+                    if ":" in t or ";":
+                        if name:
+                            if "*" in name[0]:
+                                self.changeExerciseInRoutine(workoutPlan[0], workoutPlan[-1][i], name.replace("*", ""))
+                                workoutPlan = self.cycle[-1]
+                                
+                            if sets:
+                                name = process.extractOne(name , workoutPlan[1], scorer=fuzz.ratio)
+                                if name and name[1] > 60:
+                                    matched_name = name[0]
+                                    workouts.append(Workout(matched_name, sets))
+                                else:
+                                    workouts.append(Workout("N/A", sets))
+                                sets = []
                 
-        
-        if name:
-            if "*" in name[0]:
-                self.changeExerciseInRoutine(workoutPlan[0], workoutPlan[-1][i], name.replace("*", ""))
-                workoutPlan = self.cycle[-1]
-            if sets:
-                name = process.extractOne(name , workoutPlan[1], scorer=fuzz.ratio)
-                if name and name[1] > 60:
-                    matched_name = name[0]
-                    workouts.append(Workout(matched_name, sets))
-                else:
-                    workouts.append(Workout("N/A", sets))
-                sets = []
+                        if ":" in t:
+                            index = t.find(":")
+                        else:
+                            index = t.find(";")
+                        if index != -1:
+                            name = t[:index]
+                    else:
+                        if "x" in t:
+                            tempSplit = t.split("x")
+                        elif "-" in t:
+                            tempSplit = t.split("-")
+                        elif "/" in t:
+                            tempSplit = t.split("/")
+                        else:
+                            tempSplit = t.split(" ")
+                            
+                        if tempSplit and len(tempSplit) > 1:
+                            weight = tempSplit[0]
+                            reps = tempSplit[1]
+                            sets.append(Set(weight, reps))
+                    
             
-        session = Session(workouts, datetime.datetime.today(), int(rating), workoutPlan[0])
-        
-        self.db.postWorkOut(session)
-        print(f"Processed session: {session}")
-        return session
+            if name:
+                if "*" in name[0]:
+                    self.changeExerciseInRoutine(workoutPlan[0], workoutPlan[-1][i], name.replace("*", ""))
+                    workoutPlan = self.cycle[-1]
+                if sets:
+                    name = process.extractOne(name , workoutPlan[1], scorer=fuzz.ratio)
+                    if name and name[1] > 60:
+                        matched_name = name[0]
+                        workouts.append(Workout(matched_name, sets))
+                    else:
+                        workouts.append(Workout("N/A", sets))
+                    sets = []
+                
+            session = Session(workouts, datetime.datetime.today(), int(rating), workoutPlan[0])
+            
+            self.db.postWorkOut(session)
+            print(f"Processed session: {session}")
+            return session
+        except Exception as e:
+            print(f"Failed Proccessing Text Message error: {e}")
+            self.textState.resetTextState()
     
     
     def loadInNewWorkouts(self, file):
@@ -687,8 +736,9 @@ class Coach:
             todaysRoutine = self.cycle.pop(0)
             self.cycle.append(todaysRoutine)
             self.todaysRoutine = todaysRoutine
-        
-        self.decideToadysWorkOut(self.repRangeCycle[self.todaysRoutine[0]][0], self.todaysRoutine)
+            self.decideToadysWorkOut(self.repRangeCycle[self.todaysRoutine[0]][0], self.todaysRoutine)
+        else:
+            self.getTodaysWorkOutMassage(self.repRangeCycle[self.todaysRoutine[0]][0], self.todaysRoutine)
         
     def moveBackChecker(self, weekCount, repRange, routine):
         minRep = int(repRange[routine[0]].split("-")[0])
