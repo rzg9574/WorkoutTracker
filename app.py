@@ -21,13 +21,9 @@ class Compound(Enum):
     NON_COMPOUND = "N"
     COMPOUND = "C"
     SEMI_COMPOUND = "S"
+    CARDIO = "CO"
 
 class Session:
-    workouts = []
-    date = None 
-    rating = None
-    day = None 
-    
     def __init__(self, workouts, date, rating, day):
         self.workouts = workouts
         self.date = date 
@@ -59,9 +55,6 @@ class Session:
         
         
 class Set:
-    weight = "" 
-    reps = ""
-    
     def __init__ (self, weight, reps):
         self.weight = weight 
         self.reps = reps
@@ -81,9 +74,6 @@ class Set:
     
     
 class Workout:
-    name = ""
-    sets = []
-    
     def __init__ (self, name, sets):
         self.name  = name
         self.sets = sets
@@ -128,9 +118,10 @@ class DBController:
         self.db = client["WorkoutTracker"]
         if LADY:
             self.workOutsCollection = self.db["Lady_Workouts"]
+            self.exerciseCollection = self.db["Lady_Exercises"]
         else:
             self.workOutsCollection = self.db["Workouts"]
-        self.exerciseCollection = self.db["Exercises"]
+            self.exerciseCollection = self.db["Exercises"]
         print("Database Initialized")
         
     def getLastSession(self):
@@ -211,22 +202,14 @@ class DBController:
         return self.exerciseCollection.update_one({"Name": exercise}, { "$set": { "Weight": int(newWeight) } })
     
 class Coach:
-    cycle = []
-    repRangeCycle = {} 
-    repRangeKey = {}
-    startingPercentage = 0.82
-    db = None
-    routine = None
     routineFile = "routine.json"
-    day = None
-    todaysRoutine = []
-    LADY = False
-    routineType = ""
     
     def __init__(self, textState, routineType, LADY=False):
+        self.repRangeCycle = {}
+        self.cycle = [] 
         self.LADY = LADY
         self.routineType = routineType
-        self.db = DBController(LADY=self.LADY)
+        self.db = DBController(self.LADY)
         self.loadInRoutine()
         for i in range(1, self.routine[routineType]["Unique_Days"]["Number_of_Days"] + 1):
             day = self.routine[routineType]["Unique_Days"][f"day{i}"]
@@ -238,9 +221,11 @@ class Coach:
             self.weekCount[cycle[0]] = 0
             self.repRangeCycle[cycle[0]] = self.routine["Periodization_Cycle"]
         
-        self.repRangeKey = {"Full_Compound": "4-8", "Semi_Compound": "6-8", "Non_Compound":"10-15", "Body_Weight": "7-12"}
+        self.repRangeKey = {"Full_Compound": "4-8", "Semi_Compound": "6-8", "Non_Compound":"10-15", "Body_Weight": "7-12", "Cardio":"30-60"}
         self.todaysRoutine = self.cycle[0]
         self.textState = textState
+        
+        self.startingPercentage = 0.82
                 
     def loadInRoutine(self):
         with open(self.routineFile, 'r') as file:
@@ -261,6 +246,8 @@ class Coach:
             elif split[0] == Compound.SEMI_COMPOUND.value:
                 type = "Semi_Compound"
             elif split[0] == Compound.NON_COMPOUND.value:
+                type = "Non_Compound"
+            elif split[0] == Compound.CARDIO.value:
                 type = "Non_Compound"
             
             if len(split) > 2:
@@ -359,9 +346,11 @@ class Coach:
                         message += f"{typeOfExersice['Weight']} ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
                         message += f"{typeOfExersice['Weight']} ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
                         message += f"{typeOfExersice['Weight'] - typeOfExersice['Move_Up_Rate']} ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
-        
+            elif typeOfExersice["Type"] == "Cardio":
+                message += f"{typeOfExersice['Weight']} Minutes\n"
+            
         self.sendText(message)
-        print(f"sent you a text:{message}")
+        print(f"{'Lady:\t' if self.LADY else 'Me:\t'} sent you a text:{message}")
         
     def decideToadysWorkOut(self, repRange, todaysRoutine):
         message = "Do This Today:\n"
@@ -426,16 +415,26 @@ class Coach:
                         message += f"{typeOfExersice['Weight']} ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
                         message += f"{typeOfExersice['Weight']} ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
                         message += f"{typeOfExersice['Weight'] - typeOfExersice['Move_Up_Rate']} ==> {self.repRangeKey[typeOfExersice['Type']]}\n"
-        
+            
+            elif typeOfExersice["Type"] == "Cardio":
+                if typeOfExersice["Move_Up"] == MoveUp.UP.value:
+                    message += f"{typeOfExersice['Weight'] + typeOfExersice['Move_Up_Rate']} Minutes\n"
+                    self.db.setExerciseWeight(typeOfExersice["Name"], typeOfExersice['Weight'] + typeOfExersice['Move_Up_Rate'])
+                elif typeOfExersice["Move_Up"] == MoveUp.DOWN.value:
+                    message += f"{typeOfExersice['Weight']-typeOfExersice['Move_Up_Rate']} Minutes\n"
+                    self.db.setExerciseWeight(typeOfExersice["Name"], typeOfExersice['Weight'] - typeOfExersice['Move_Up_Rate'])
+                else:
+                    message += f"{typeOfExersice['Weight']} Minutes\n"
+                    
         self.sendText(message)
-        print(f"sent you a text:{message}")
+        print(f"{'Lady:\t' if self.LADY else 'Me:\t'} sent you a text:{message}")
     
     def incomingText(self, text):
         load_dotenv()
         sets = []
         workouts = []
         workoutPlan = self.cycle[-1]
-        print(f"workout plan you were suppose follow {workoutPlan[1]}")
+        print(f"{'Lady:\t' if self.LADY else 'Me:\t'} workout plan you were suppose follow {workoutPlan[1]}")
         session = None
         nextOne = True
         name = None
@@ -526,10 +525,10 @@ class Coach:
             session = Session(workouts, datetime.datetime.today(), int(rating), workoutPlan[0])
             
             self.db.postWorkOut(session)
-            print(f"Processed session: {session}")
+            print(f"{'Lady:\t' if self.LADY else 'Me:\t'} Processed session: {session}")
             return session
         except Exception as e:
-            print(f"Failed Proccessing Text Message error: {e}")
+            print(f"{'Lady:\t' if self.LADY else 'Me:\t'} Failed Proccessing Text Message error: {e}")
             self.textState.resetTextState()
     
     
@@ -698,7 +697,7 @@ class Coach:
                 if type["Type"] == "Full_Compound":    
                     if compoundPoints >= 4:
                         passFail.append({exercise: ["P", compoundPoints]})
-                    elif compoundPoints < 3:
+                    elif compoundPoints < 2:
                         passFail.append({exercise: ["F+", compoundPoints]})
                     else:
                         passFail.append({exercise: ["F", compoundPoints]})
@@ -706,12 +705,12 @@ class Coach:
                 else:
                     if nonCompoundPoints >= 4:
                         passFail.append({exercise: ["P", nonCompoundPoints]})
-                    elif nonCompoundPoints <= 3:
+                    elif nonCompoundPoints <= 2:
                         passFail.append({exercise: ["F+", nonCompoundPoints] })
                     else:
                         passFail.append({exercise: ["F", nonCompoundPoints]})
                         
-        print(f"Heres your report card:{passFail}")
+        print(f"{'Lady:\t' if self.LADY else 'Me:\t'} Heres your report card:{passFail}")
         for exercise in passFail:
             exerciseName, grade = next(iter(exercise.items()))
             type = self.db.getTypeOfExercise(exerciseName)
@@ -782,12 +781,12 @@ class Coach:
         weekTracker = False
         dayTracker = False
         last_day_processed = None
-        print(f"Starting openLoop method. today is {self.cycle[-1]} Tmr is {self.todaysRoutine}")
+        print(f"{'Lady:\t' if self.LADY else 'Me:\t'}Starting openLoop method. today is {self.todaysRoutine} Tmr is {self.cycle[1]}")
         while True:
             now = datetime.datetime.now()
             
             if now.weekday() == 0 and now.hour == startHour and now.minute == startMinute and not weekTracker:
-                print("New week detected. Running weekly logic.")
+                print(f"{'Lady:\t' if self.LADY else 'Me:\t'}New week detected. Running weekly logic.")
                 for week in self.weekCount:
                     self.weekCount[week] += 1 
                     logging.debug(f"About to run moveUpChecker for {week} with weekCount={self.weekCount[week]}")
@@ -804,26 +803,26 @@ class Coach:
                         logging.debug(f"Rotated rep range cycle for {week}")
                         
                 weekTracker = True
-                print("Weekly logic complete")
+                print(f"{'Lady:\t' if self.LADY else 'Me:\t'}Weekly logic complete")
                 
             # Reset weekly flag on any day other than the first day of the week
             if now.weekday() != 0:
                 weekTracker = False
             
             if now.hour == startHour and now.minute == startMinute and (last_day_processed is None or last_day_processed != now.date()):
-                print("New day detected. Running daily logic.")
+                print(f"{'Lady:\t' if self.LADY else 'Me:\t'}New day detected. Running daily logic.")
                 if self.textState.getState():
-                    print("Received text state as True, scheduling new workout.")
+                    print(f"{'Lady:\t' if self.LADY else 'Me:\t'}Received text state as True, scheduling new workout.")
                     self.newDay(pastDayWasARestDay=False)
                     
                 else:
-                    print("No text detected, assuming rest day.")
-                    print("I See We Resting Now Loser")
+                    print(f"{'Lady:\t' if self.LADY else 'Me:\t'}No text detected, assuming rest day.")
+                    print(f"{'Lady:\t' if self.LADY else 'Me:\t'}I See We Resting Now Loser")
                     self.newDay(pastDayWasARestDay=True)
                     
                 self.textState.resetTextState()
                 last_day_processed = now.date()
-                print("Daily logic complete. Sleeping for 60 seconds.") 
+                print(f"{'Lady:\t' if self.LADY else 'Me:\t'}Daily logic complete. Sleeping for 60 seconds.") 
                 time.sleep(60)
             
 
@@ -847,8 +846,8 @@ class TextListener:
     def __init__(self, coach, textState, ladyCoach, ladyTextState):
         self.coach = coach
         self.textState = textState
-        self.ladyCoach = ladyCoach
-        self.ladyTextState = ladyTextState
+        self.LADYCoach = ladyCoach
+        self.LADYTextState = ladyTextState
         #Twillo api sends there texts in UTC time have to convert to EST
         self.timeOffset = 5
         self.load_twilio_credentials()
@@ -865,7 +864,7 @@ class TextListener:
         self.token = os.environ.get("token")
         self.twilio_phone_number = os.environ.get("twilloPhoneNumber")
         self.my_phone_number = os.environ.get("myPhoneNumber")
-        self.lady_phone_number = os.environ.get("ladyPhoneNumber")
+        self.LADY_phone_number = os.environ.get("ladyPhoneNumber")
     
     def check_for_incoming_text(self):
         messages = self.client.messages.list(
@@ -881,10 +880,10 @@ class TextListener:
                 self.coach.incomingText(message.body)
                 print(f"Processed message: {message.body}")
                 
-            if message.sid not in self.processed_messages and message.from_ == self.lady_phone_number:
+            if message.sid not in self.processed_messages and message.from_ == self.LADY_phone_number:
                 self.processed_messages.add(message.sid)
-                self.ladyTextState.gotText()
-                self.ladyCoach.incomingText(message.body)
+                self.LADYTextState.gotText()
+                self.LADYCoach.incomingText(message.body)
                 print(f"Processed message: {message.body}")
               
         self.last_checked = datetime.datetime.now()
@@ -902,23 +901,24 @@ class TextListener:
 
 
 
+
 if __name__ == "__main__":
     myTextState = TextState() 
     myCoach = Coach(myTextState, "PPL")
     
     ladyTextState = TextState()
-    ladyCoach = Coach(ladyTextState, "PPL")
+    ladyCoach = Coach(ladyTextState, "Lady", True)
     
     listener = TextListener(myCoach, myTextState, ladyCoach, ladyTextState)    
      
     coach_thread = threading.Thread(target=myCoach.openLoop, daemon=True)
-    #lady_thread = threading.Thread(target=ladyCoach.openLoop, daemon=True)
+    lady_thread = threading.Thread(target=ladyCoach.openLoop, daemon=True)
     listener_thread = threading.Thread(target=listener.start_listening, daemon=True)
 
-    #lady_thread.start()
+    lady_thread.start()
     coach_thread.start()
     listener_thread.start()
 
-    #lady_thread.join()
+    lady_thread.join()
     coach_thread.join()
     listener_thread.join()  

@@ -1,97 +1,17 @@
-{
-  "_id": {
-    "$oid": "674c9c4dc01eb16154f98d40"
-  },
-  "Date": {
-    "$date": "2024-12-8T05:00:00.000Z"
-  },
-  "List_of_Workouts": [
-    {
-      "Name": "Bench_Press",
-      "Sets": [
-        {
-          "Weight": 195,
-          "Reps": 4
-        },
-        {
-          "Weight": 185,
-          "Reps": 5
-        },
-        {
-          "Weight": 155,
-          "Reps": 6
-        }
-      ]
-    },
-    {
-      "Name": "Chest_Fly",
-      "Sets": [
-        {
-          "Weight": 145,
-          "Reps": 9
-        },
-        {
-          "Weight": 135,
-          "Reps": 8
-        },
-        {
-          "Weight": 125,
-          "Reps": 8
-        }
-      ]
-    },
-    {
-      "Name": "Incline_Dumbbell_Press",
-      "Sets": [
-        {
-          "Weight": 60,
-          "Reps": 7
-        },
-        {
-          "Weight": 60,
-          "Reps": 6
-        },
-        {
-          "Weight": 55,
-          "Reps": 6
-        }
-      ]
-    },
-    {
-      "Name": "Tricep_Pull_Down",
-      "Sets": [
-        {
-          "Weight": 80,
-          "Reps": 12
-        },
-        {
-          "Weight": 70,
-          "Reps": 12
-        },
-        {
-          "Weight": 70,
-          "Reps": 12
-        }
-      ]
-    },
-    {
-      "Name": "Plate_Loaded_Shoulder_Press",
-      "Sets": [
-        {
-          "Weight": 55,
-          "Reps": 7
-        },
-        {
-          "Weight": 55,
-          "Reps": 5
-        },
-        {
-          "Weight": 45,
-          "Reps": 6
-        }
-      ]
-    }
-  ],
-  "Rating": 4,
-  "Day": "Push"
-}
+Stair_Master,Cardio,5,30
+Weighted_Crunch_Machine,Non_Compound,5,35
+Squats,Full_Compound,10,115
+Pendulum_Squats,Semi_Compound,10,55
+Hamstring_Curls,Non_Compound,5,80
+Leg_Extensions,Non_Compound,5,85
+Pull_Downs,Non_Compound,5,50
+T-Bar_Rows,Non_Compound,5,30  
+Bicep_Curls,Non_Compound,5,10
+High_Machine_Rows,Non_Compound,5,25
+Hip_Thrusts,Semi_Compound,10,235
+RDLS,Semi_Compound,10,105  
+Dumbbell_Bulgarian_Split_Squats,Non_Compound,5,40
+Back_Extension,Non_Compound,10,35
+Peck_Deck,Semi_Compound,5,50  
+Dumbell_Shoulder_Press,Non_Compound,10,15
+Tricep_Pull_Down,Non_Compound,5,50
