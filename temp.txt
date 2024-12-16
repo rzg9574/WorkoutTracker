@@ -1,17 +1,80 @@
-Stair_Master,Cardio,5,30
-Weighted_Crunch_Machine,Non_Compound,5,35
-Squats,Full_Compound,10,115
-Pendulum_Squats,Semi_Compound,10,55
-Hamstring_Curls,Non_Compound,5,80
-Leg_Extensions,Non_Compound,5,85
-Pull_Downs,Non_Compound,5,50
-T-Bar_Rows,Non_Compound,5,30  
-Bicep_Curls,Non_Compound,5,10
-High_Machine_Rows,Non_Compound,5,25
-Hip_Thrusts,Semi_Compound,10,235
-RDLS,Semi_Compound,10,105  
-Dumbbell_Bulgarian_Split_Squats,Non_Compound,5,40
-Back_Extension,Non_Compound,10,35
-Peck_Deck,Semi_Compound,5,50  
-Dumbell_Shoulder_Press,Non_Compound,10,15
-Tricep_Pull_Down,Non_Compound,5,50
+{
+  "_id": {
+    "$oid": "6759b2333a08f08875cb1f5a"
+  },
+  "Date": {
+    "$date": "2024-12-15T00:00:00.000Z"
+  },
+  "List_of_Workouts": [
+    {
+      "Name": "Hamstring_Curls",
+      "Sets": [
+        {
+          "Weight": 130,
+          "Reps": 10
+        },
+        {
+          "Weight": 110,
+          "Reps": 10
+        },
+        {
+          "Weight": 110,
+          "Reps": 10
+        }
+      ]
+    },
+    {
+      "Name": "Squats",
+      "Sets": [
+        {
+          "Weight": 255,
+          "Reps": 4
+        },
+        {
+          "Weight": 235,
+          "Reps": 6
+        },
+        {
+          "Weight": 235,
+          "Reps": 4
+        }
+      ]
+    },
+    {
+      "Name": "Seated_Calf_Raises",
+      "Sets": [
+        {
+          "Weight": 90,
+          "Reps": 12
+        },
+        {
+          "Weight": 80,
+          "Reps": 12
+        },
+        {
+          "Weight": 70,
+          "Reps": 10
+        }
+      ]
+    },
+    {
+      "Name": "Leg_Extensions",
+      "Sets": [
+        {
+          "Weight": 150,
+          "Reps": 10
+        },
+        {
+          "Weight": 130,
+          "Reps": 10
+        },
+        {
+          "Weight": 110,
+          "Reps": 10
+        }
+      ]
+    }
+  ],
+  "Rating": 7,
+  "Day": "Legs"
+}

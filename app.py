@@ -350,7 +350,7 @@ class Coach:
                 message += f"{typeOfExersice['Weight']} Minutes\n"
             
         self.sendText(message)
-        print(f"{'Lady:\t' if self.LADY else 'Me:\t'} sent you a text:{message}")
+        print(f" sent you a text:{message}")
         
     def decideToadysWorkOut(self, repRange, todaysRoutine):
         message = "Do This Today:\n"
@@ -427,14 +427,14 @@ class Coach:
                     message += f"{typeOfExersice['Weight']} Minutes\n"
                     
         self.sendText(message)
-        print(f"{'Lady:\t' if self.LADY else 'Me:\t'} sent you a text:{message}")
+        print(f" sent you a text:{message}")
     
     def incomingText(self, text):
         load_dotenv()
         sets = []
         workouts = []
         workoutPlan = self.cycle[-1]
-        print(f"{'Lady:\t' if self.LADY else 'Me:\t'} workout plan you were suppose follow {workoutPlan[1]}")
+        print(f" workout plan you were suppose follow {workoutPlan[1]}")
         session = None
         nextOne = True
         name = None
@@ -525,10 +525,10 @@ class Coach:
             session = Session(workouts, datetime.datetime.today(), int(rating), workoutPlan[0])
             
             self.db.postWorkOut(session)
-            print(f"{'Lady:\t' if self.LADY else 'Me:\t'} Processed session: {session}")
+            print(f" Processed session: {session}")
             return session
         except Exception as e:
-            print(f"{'Lady:\t' if self.LADY else 'Me:\t'} Failed Proccessing Text Message error: {e}")
+            print(f" Failed Proccessing Text Message error: {e}")
             self.textState.resetTextState()
     
     
@@ -541,7 +541,7 @@ class Coach:
         holdBack = False
         passFail = []
         
-        for exercise in routine[1]:
+        for exercise in routine:
             type = self.db.getTypeOfExercise(exercise)
             compoundPoints = 0
             nonCompoundPoints = 0
@@ -710,18 +710,19 @@ class Coach:
                     else:
                         passFail.append({exercise: ["F", nonCompoundPoints]})
                         
-        print(f"{'Lady:\t' if self.LADY else 'Me:\t'} Heres your report card:{passFail}")
+        print(f" Heres your report card:{passFail}")
         for exercise in passFail:
             exerciseName, grade = next(iter(exercise.items()))
             type = self.db.getTypeOfExercise(exerciseName)
             if type["Type"] == "Full_Compound" and grade[0] == "F":
                 holdBack = True
-                
-            if grade[0] == "P":
-                self.db.setExerciseMoveUpTrue(exerciseName)
-            if grade[0] == "F+":
                 self.db.setExerciseMoveUpFalse(exerciseName)
-        
+            elif grade[0] == "P":
+                self.db.setExerciseMoveUpTrue(exerciseName)
+            elif grade[0] == "F+":
+                self.db.setExerciseMoveUpFalse(exerciseName)
+            elif grade[0] == "F":
+                self.db.setExerciseMoveUpNeural(exerciseName)
         
         if holdBack:
             return weekCount - 1
@@ -781,48 +782,49 @@ class Coach:
         weekTracker = False
         dayTracker = False
         last_day_processed = None
-        print(f"{'Lady:\t' if self.LADY else 'Me:\t'}Starting openLoop method. today is {self.todaysRoutine} Tmr is {self.cycle[1]}")
+        print(f"Starting openLoop method. today is {self.todaysRoutine} Tmr is {self.cycle[1]}")
         while True:
             now = datetime.datetime.now()
             
             if now.weekday() == 0 and now.hour == startHour and now.minute == startMinute and not weekTracker:
-                print(f"{'Lady:\t' if self.LADY else 'Me:\t'}New week detected. Running weekly logic.")
+                print(f"New week detected. Running weekly logic.")
                 for week in self.weekCount:
+                    print(f"Processing week: {week} with current count: {self.weekCount[week]}")
                     self.weekCount[week] += 1 
-                    logging.debug(f"About to run moveUpChecker for {week} with weekCount={self.weekCount[week]}")
+                    print(f"About to run moveUpChecker for {week} with weekCount={self.weekCount[week]}")
                     if  self.weekCount[week] == 1:
-                        self.weekCount[week] = self.moveUpChecker(self.weekCount[week], self.repRangeCycle[week], self.todaysRoutine)
-                        logging.debug(f"moveUpChecker adjusted {week} from {self.weekCount[week]} to {self.weekCount[week]}")
+                        self.weekCount[week] = self.moveUpChecker(self.weekCount[week], self.repRangeCycle[week], self.routine[self.routineType]["Routine"][week])
+                        print(f"moveUpChecker adjusted {week} from {self.weekCount[week]} to {self.weekCount[week]}")
                     elif self.weekCount[week] == 2:
-                        self.weekCount[week] = self.moveBackChecker(self.weekCount[week], self.repRangeCycle[week], self.todaysRoutine) 
+                        self.weekCount[week] = self.moveBackChecker(self.weekCount[week], self.repRangeCycle[week], self.routine[self.routineType]["Routine"][week]) 
                     elif self.weekCount[week] == 4:
-                        self.weekCount[week] = self.moveUpChecker(self.weekCount[week], self.repRangeCycle[week], self.todaysRoutine)
+                        self.weekCount[week] = self.moveUpChecker(self.weekCount[week], self.repRangeCycle[week], self.routine[self.routineType]["Routine"][week])
                         self.weekCount[week] = 0
                         range = self.repRangeCycle[week].pop(0)
                         self.repRangeCycle[week].append(range)
-                        logging.debug(f"Rotated rep range cycle for {week}")
+                        print(f"Rotated rep range cycle for {week}")
                         
                 weekTracker = True
-                print(f"{'Lady:\t' if self.LADY else 'Me:\t'}Weekly logic complete")
+                print(f"Weekly logic complete")
                 
             # Reset weekly flag on any day other than the first day of the week
             if now.weekday() != 0:
                 weekTracker = False
             
             if now.hour == startHour and now.minute == startMinute and (last_day_processed is None or last_day_processed != now.date()):
-                print(f"{'Lady:\t' if self.LADY else 'Me:\t'}New day detected. Running daily logic.")
+                print(f"New day detected. Running daily logic.")
                 if self.textState.getState():
-                    print(f"{'Lady:\t' if self.LADY else 'Me:\t'}Received text state as True, scheduling new workout.")
+                    print(f"Received text state as True, scheduling new workout.")
                     self.newDay(pastDayWasARestDay=False)
                     
                 else:
-                    print(f"{'Lady:\t' if self.LADY else 'Me:\t'}No text detected, assuming rest day.")
-                    print(f"{'Lady:\t' if self.LADY else 'Me:\t'}I See We Resting Now Loser")
+                    print(f"No text detected, assuming rest day.")
+                    print(f"I See We Resting Now Loser")
                     self.newDay(pastDayWasARestDay=True)
                     
                 self.textState.resetTextState()
                 last_day_processed = now.date()
-                print(f"{'Lady:\t' if self.LADY else 'Me:\t'}Daily logic complete. Sleeping for 60 seconds.") 
+                print(f"Daily logic complete. Sleeping for 60 seconds.") 
                 time.sleep(60)
             
 
@@ -843,11 +845,10 @@ class TextState:
         return self._gotText
     
 class TextListener:
-    def __init__(self, coach, textState, ladyCoach, ladyTextState):
+    def __init__(self, coach, textState, LADY=False):
+        self.LADY = LADY
         self.coach = coach
         self.textState = textState
-        self.LADYCoach = ladyCoach
-        self.LADYTextState = ladyTextState
         #Twillo api sends there texts in UTC time have to convert to EST
         self.timeOffset = 5
         self.load_twilio_credentials()
@@ -863,9 +864,11 @@ class TextListener:
         self.sid = os.environ.get("SID")
         self.token = os.environ.get("token")
         self.twilio_phone_number = os.environ.get("twilloPhoneNumber")
-        self.my_phone_number = os.environ.get("myPhoneNumber")
-        self.LADY_phone_number = os.environ.get("ladyPhoneNumber")
-    
+        if self.LADY:
+            self.my_phone_number = os.environ.get("ladyPhoneNumber")
+        else:
+            self.my_phone_number = os.environ.get("myPhoneNumber")
+            
     def check_for_incoming_text(self):
         messages = self.client.messages.list(
             to=self.twilio_phone_number,
@@ -878,12 +881,6 @@ class TextListener:
                 self.processed_messages.add(message.sid)
                 self.textState.gotText()
                 self.coach.incomingText(message.body)
-                print(f"Processed message: {message.body}")
-                
-            if message.sid not in self.processed_messages and message.from_ == self.LADY_phone_number:
-                self.processed_messages.add(message.sid)
-                self.LADYTextState.gotText()
-                self.LADYCoach.incomingText(message.body)
                 print(f"Processed message: {message.body}")
               
         self.last_checked = datetime.datetime.now()
@@ -900,25 +897,3 @@ class TextListener:
             time.sleep(10) 
 
 
-
-
-if __name__ == "__main__":
-    myTextState = TextState() 
-    myCoach = Coach(myTextState, "PPL")
-    
-    ladyTextState = TextState()
-    ladyCoach = Coach(ladyTextState, "Lady", True)
-    
-    listener = TextListener(myCoach, myTextState, ladyCoach, ladyTextState)    
-     
-    coach_thread = threading.Thread(target=myCoach.openLoop, daemon=True)
-    lady_thread = threading.Thread(target=ladyCoach.openLoop, daemon=True)
-    listener_thread = threading.Thread(target=listener.start_listening, daemon=True)
-
-    lady_thread.start()
-    coach_thread.start()
-    listener_thread.start()
-
-    lady_thread.join()
-    coach_thread.join()
-    listener_thread.join()  
