@@ -1,80 +1,89 @@
 {
   "_id": {
-    "$oid": "6759b2333a08f08875cb1f5a"
+    "$oid": "6760394cc9e4da76219439ae"
   },
   "Date": {
-    "$date": "2024-12-15T00:00:00.000Z"
+    "$date": "2024-12-16T12:13:37.614Z"
   },
   "List_of_Workouts": [
     {
-      "Name": "Hamstring_Curls",
+      "Name": "Dead_Lifts",
       "Sets": [
         {
-          "Weight": 130,
-          "Reps": 10
-        },
-        {
-          "Weight": 110,
-          "Reps": 10
-        },
-        {
-          "Weight": 110,
-          "Reps": 10
-        }
-      ]
-    },
-    {
-      "Name": "Squats",
-      "Sets": [
-        {
-          "Weight": 255,
-          "Reps": 4
-        },
-        {
-          "Weight": 235,
+          "Weight": 355,
           "Reps": 6
+        }
+      ]
+    },
+    {
+      "Name": "Barbell_Rows",
+      "Sets": [
+        {
+          "Weight": 155,
+          "Reps": 7
         },
         {
-          "Weight": 235,
+          "Weight": 135,
+          "Reps": 10
+        },
+        {
+          "Weight": 135,
+          "Reps": 7
+        }
+      ]
+    },
+    {
+      "Name": "Pull_Ups",
+      "Sets": [
+        {
+          "Weight": 0,
+          "Reps": 7
+        },
+        {
+          "Weight": 0,
+          "Reps": 7
+        },
+        {
+          "Weight": 0,
           "Reps": 4
         }
       ]
     },
     {
-      "Name": "Seated_Calf_Raises",
+      "Name": "Hammer_Curls",
       "Sets": [
         {
-          "Weight": 90,
-          "Reps": 12
+          "Weight": 35,
+          "Reps": 7
         },
         {
-          "Weight": 80,
-          "Reps": 12
-        },
-        {
-          "Weight": 70,
+          "Weight": 30,
           "Reps": 10
+        },
+        {
+          "Weight": 30,
+          "Reps": 12
         }
       ]
     },
     {
-      "Name": "Leg_Extensions",
+      "Name": "Machine_Curls",
       "Sets": [
         {
-          "Weight": 150,
+          "Weight": 50,
           "Reps": 10
         },
         {
-          "Weight": 130,
+          "Weight": 50,
           "Reps": 10
         },
         {
-          "Weight": 110,
+          "Weight":40,
           "Reps": 10
         }
       ]
     }
   ],
   "Rating": 7,
-  "Day": "Legs"
+  "Day": "Pull"
 }

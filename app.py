@@ -218,7 +218,7 @@ class Coach:
         self.numberOfSeparateWeeksToTrack = len(self.cycle)
         self.weekCount = {}
         for cycle in self.cycle:
-            self.weekCount[cycle[0]] = 0
+            self.weekCount[cycle[0]] = self.routine[routineType]["Week_Offset"][cycle[0]]
             self.repRangeCycle[cycle[0]] = self.routine["Periodization_Cycle"]
         
         self.repRangeKey = {"Full_Compound": "4-8", "Semi_Compound": "6-8", "Non_Compound":"10-15", "Body_Weight": "7-12", "Cardio":"30-60"}
@@ -472,7 +472,7 @@ class Coach:
                                 
                         continue
             
-                    if ":" in t or ";":
+                    if ":" in t or ";" in t:
                         if name:
                             if "*" in name[0]:
                                 self.changeExerciseInRoutine(workoutPlan[0], workoutPlan[-1][i], name.replace("*", ""))
@@ -782,7 +782,7 @@ class Coach:
         weekTracker = False
         dayTracker = False
         last_day_processed = None
-        print(f"Starting openLoop method. today is {self.todaysRoutine} Tmr is {self.cycle[1]}")
+        print(f"Starting openLoop method. today is {self.cycle[-1]} Tmr is {self.todaysRoutine}")
         while True:
             now = datetime.datetime.now()
             
@@ -881,7 +881,6 @@ class TextListener:
                 self.processed_messages.add(message.sid)
                 self.textState.gotText()
                 self.coach.incomingText(message.body)
-                print(f"Processed message: {message.body}")
               
         self.last_checked = datetime.datetime.now()
         self.cleanup_processed_messages()

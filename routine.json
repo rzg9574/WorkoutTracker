@@ -9,14 +9,19 @@
     "PPL":{
         "Unique_Days":{
             "Number_of_Days": 3,
-            "day1" : "Chest",
-            "day2" : "Legs",
-            "day3" : "Pull"
+            "day1" : "Legs",
+            "day2" : "Pull",
+            "day3" : "Push"
         }, 
         "Routine": {
             "Push": ["Bench_Press", "Chest_Fly", "Incline_Dumbbell_Press", "Tricep_Pull_Down", "Plate_Loaded_Shoulder_Press"], 
             "Pull": ["Dead_Lifts", "Barbell_Rows", "Pull_Ups", "Hammer_Curls", "Machine_Curls"], 
             "Legs": ["Hamstring_Curls", "Squats", "Seated_Calf_Raises", "Leg_Extensions"]
+        },
+        "Week_Offset":{
+            "Push": 0,
+            "Pull": 0,
+            "Legs": 0
         }    
     },
 
@@ -34,7 +39,13 @@
             "Back": ["Dead_Lifts", "Barbell_Rows", "Pull_Ups"],
             "Arms": ["Hammer_Curls", "Machine_Curls", "Tricep_Pull_Down", "Plate_Loaded_Shoulder_Press"],
             "Legs": ["Hamstring_Curls", "Squats", "Seated_Calf_Raises", "Leg_Extensions"]
-        }    
+        },
+        "Week_Offset":{
+            "Chest": 0,
+            "Back": 0,
+            "Arms": 0,
+            "Legs": 0
+        }     
     },
 
 
@@ -51,6 +62,12 @@
             "Back": ["Pull_Downs", "T-Bar_Rows", "Bicep_Curls", "High_Machine_Rows", "Weighted_Crunch_Machine", "Stair_Master"],
             "Glutes": ["Hip_Thrusts", "RDLS", "Dumbbell_Bulgarian_Split_Squats", "Back_Extension", "Weighted_Crunch_Machine"],
             "Chest": ["Peck_Deck", "Dumbell_Shoulder_Press", "Tricep_Pull_Down", "Stair_Master", "Weighted_Crunch_Machine"]
+        },
+        "Week_Offset":{
+            "Chest": 0,
+            "Back": 0,
+            "Glutes": 0,
+            "Legs": 0
         }
     }
 }
